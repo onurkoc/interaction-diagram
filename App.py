@@ -4,11 +4,13 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State
 from draw_diagram import draw
+import dash_table
 import core
 import csv_read
 import xls_read
 import base64
 import io
+import pandas as pd
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -85,7 +87,7 @@ app.layout = html.Div([
                 html.I('"ZSoil.csv"')
             ]),
             style={
-                'width': '1400px',
+                'width': '70%',
                 'height': '40px',
                 'lineHeight': '40px',
                 'borderWidth': '1px',
@@ -94,12 +96,18 @@ app.layout = html.Div([
                 'textAlign': 'center',
                 'margin': '10px'
             },
-            multiple=True
+            multiple=False
         ),
     ]),
     Row([
-        Column(width=10,
-               style={'width': 200},
+        Column(width=2,
+               style={'width': '10%',
+                      'display': 'inline-block',
+                      'marginBottom': 0,
+                      'marginTop': 0,
+                      'marginLeft': 0,
+                      'marginRight': 0,
+                      'padding': 0},
                children=[
                     html.Div([
                         NamedInput(
@@ -153,6 +161,7 @@ app.layout = html.Div([
                                 {'label': '1.00', 'value': 1.00},
                                 {'label': '0.85', 'value': 0.85},
                             ],
+                            style={'width': 200},
                             multi=False,
                             value=1.50
                         )
@@ -165,6 +174,7 @@ app.layout = html.Div([
                                 {'label': '1.15', 'value': 1.15},
                                 {'label': '1.00', 'value': 1.00}
                             ],
+                            style={'width': 200},
                             multi=False,
                             value=1.15
                         )
@@ -179,6 +189,7 @@ app.layout = html.Div([
                                 {'label': 'C30/37', 'value': 30},
                                 {'label': 'C40/50', 'value': 40},
                             ],
+                            style={'width': 200},
                             multi=False,
                             value=20
                         )
@@ -192,6 +203,7 @@ app.layout = html.Div([
                                 {'label': 'B500', 'value': 500},
                                 {'label': 'B550', 'value': 550},
                             ],
+                            style={'width': 200},
                             multi=False,
                             value=550
                         )
@@ -205,6 +217,7 @@ app.layout = html.Div([
                                 {'label': '1.40', 'value': 1.40},
                                 {'label': '1.00', 'value': 1.00},
                             ],
+                            style={'width': 200},
                             multi=False,
                             value=1.35
                         )
@@ -244,9 +257,32 @@ app.layout = html.Div([
                     ]),
                ]),
         Column(
-            width=7,
+            width=6,
+            style={'width': '50%',
+                   'display': 'inline-block',
+                   'marginBottom': 0,
+                   'marginTop': 0,
+                   'marginLeft': 0,
+                   'marginRight': 0,
+                   'padding': 0},
             children=[
                 html.Div(id='output-diagram')
+            ]
+        ),
+        Column(
+            width=3,
+            style={'width': '10%',
+                   'display': 'inline-block',
+                   'marginBottom': 0,
+                   'marginTop': 0,
+                   'marginLeft': 0,
+                   'marginRight': 0,
+                   'padding': 0},
+            children=[
+                html.Br(),
+                html.P('Design Values',
+                       style={'color': 'red', 'fontSize': 18}),
+                html.Div(id='output-table')
             ]
         )
     ])
@@ -255,10 +291,10 @@ app.layout = html.Div([
 
 def parse_contents(contents, filename, last_modified):
     file_A = contents
-    content_type, content_string = file_A[0].split(',')
+    content_type, content_string = file_A.split(',')
     decoded = base64.b64decode(content_string)
     try:
-        if 'csv' in filename[0]:
+        if 'csv' in filename:
             # Assuming user uploaded a csv file
             try:
                 decoded_str = io.StringIO(decoded.decode('utf-8'))
@@ -267,7 +303,7 @@ def parse_contents(contents, filename, last_modified):
                 print(e)
                 return html.H3(['There has been an upload error<br>First '
                                 'exception'])
-        elif 'xls' in filename[0]:
+        elif 'xls' in filename:
             # Assuming user uploaded an excel file
             decoded_str = io.BytesIO(decoded)
             x, y = xls_read.read(decoded_str)
@@ -305,7 +341,7 @@ def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
     if filename is not None:
         try:
             x, y = parse_contents(contents, filename, last_modified)
-        except (TypeError, AttributeError) as e:
+        except (ValueError, TypeError, AttributeError) as e:
             print(e)
             return html.H3([
                 'Please feed data'
@@ -327,6 +363,37 @@ def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
         return html.H3(['No data available'])
     else:
         return graph
+
+
+@app.callback(
+    Output(component_id='output-table', component_property='children'),
+    [Input(component_id='upload-data', component_property='contents'),
+     Input(component_id='load_factor', component_property='value')],
+    [State(component_id='upload-data', component_property='filename'),
+     State(component_id='upload-data', component_property='last_modified')]
+)
+def update_output_table(contents, factor, filename, last_modified):
+    if contents is None:
+        return
+    x, y = parse_contents(contents, filename, last_modified)
+    df = pd.DataFrame.from_dict({'m [kN.m]': (factor*x).round(decimals=3),
+                                 'n [kN]': (factor*y).round(decimals=1)})
+    return dash_table.DataTable(data=df.to_dict('rows'),
+                                columns=[{'id': c, 'name': c}
+                                for c in df.columns],
+                                style_table={'maxHeight': '500',
+                                             'overflowY': 'scroll'},
+                                style_header={
+                                    'fontWeight': 'bold'
+                                },
+                                n_fixed_rows=1,
+                                style_as_list_view=True,
+                                style_cell={
+                                    'minWidth': '0px',
+                                    'maxWidth': '20px',
+                                    'textAlign': 'center'
+                                }
+                                )
 
 
 if __name__ == '__main__':
