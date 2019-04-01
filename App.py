@@ -11,14 +11,15 @@ import xls_read
 import base64
 import io
 import pandas as pd
+import cult_i
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 
 def Header(title):
     return html.Div(
         style={'borderBottom': 'thin lightgrey solid', 'marginRight': 20},
-        children=[html.Div(title, style={'fontSize': 30})]
+        children=[html.Div(title, style={'fontSize': 25})]
     )
 
 
@@ -69,9 +70,23 @@ def NamedInput(myId, name, **kwargs):
     )
 
 
+def NamedRadioItems(myId, name, **kwargs):
+    return html.Div(
+        style={'margin': '10px 0px'},
+        children=[
+            html.P(
+                children=f'{name}',
+                style={'margin-left': '3px'}
+            ),
+            dcc.RadioItems(id=myId, **kwargs)
+        ]
+    )
+
+
 app = dash.Dash(__name__,
                 # external_scripts=external_js,
-                external_stylesheets=external_stylesheets)
+                # external_stylesheets=external_stylesheets
+                )
 
 server = app.server
 
@@ -87,7 +102,7 @@ app.layout = html.Div([
                 html.I('"ZSoil.csv"')
             ]),
             style={
-                'width': '70%',
+                'width': '80%',
                 'height': '40px',
                 'lineHeight': '40px',
                 'borderWidth': '1px',
@@ -115,7 +130,7 @@ app.layout = html.Div([
                             name='Height',
                             type='number',
                             value=0.35,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -126,7 +141,7 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=1.0,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -137,7 +152,7 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=0.03,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -148,7 +163,7 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=0.03,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -161,7 +176,7 @@ app.layout = html.Div([
                                 {'label': '1.00', 'value': 1.00},
                                 {'label': '0.85', 'value': 0.85},
                             ],
-                            style={'width': 200},
+                            style={'width': 150},
                             multi=False,
                             value=1.50
                         )
@@ -174,7 +189,7 @@ app.layout = html.Div([
                                 {'label': '1.15', 'value': 1.15},
                                 {'label': '1.00', 'value': 1.00}
                             ],
-                            style={'width': 200},
+                            style={'width': 150},
                             multi=False,
                             value=1.15
                         )
@@ -189,7 +204,7 @@ app.layout = html.Div([
                                 {'label': 'C30/37', 'value': 30},
                                 {'label': 'C40/50', 'value': 40},
                             ],
-                            style={'width': 200},
+                            style={'width': 150},
                             multi=False,
                             value=20
                         )
@@ -203,7 +218,7 @@ app.layout = html.Div([
                                 {'label': 'B500', 'value': 500},
                                 {'label': 'B550', 'value': 550},
                             ],
-                            style={'width': 200},
+                            style={'width': 150},
                             multi=False,
                             value=550
                         )
@@ -217,7 +232,7 @@ app.layout = html.Div([
                                 {'label': '1.40', 'value': 1.40},
                                 {'label': '1.00', 'value': 1.00},
                             ],
-                            style={'width': 200},
+                            style={'width': 150},
                             multi=False,
                             value=1.35
                         )
@@ -230,7 +245,7 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=2.58,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -241,7 +256,7 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=2.58,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
                     html.Div([
@@ -252,13 +267,37 @@ app.layout = html.Div([
                             inputmode='numeric',
                             type='number',
                             value=1.00,
-                            style={'width': 200}
+                            style={'width': 150}
                         )
                     ]),
+                   html.Div([
+                       NamedRadioItems(
+                           myId='eccentricity',
+                           name='Limit capacity?',
+                           options=[
+                                {'label': 'Yes', 'value': 'yes'},
+                                {'label': 'No', 'value': 'no'}
+                            ],
+                           value='no',
+                           labelStyle={'display': 'inline-block'}
+                       )
+                   ]),
+                   html.Div([
+                       NamedRadioItems(
+                           myId='cult-i',
+                           name='CULT-I?',
+                           options=[
+                                {'label': 'Yes', 'value': 'yes'},
+                                {'label': 'No', 'value': 'no'}
+                            ],
+                           value='yes',
+                           labelStyle={'display': 'inline-block'}
+                       )
+                   ])
                ]),
         Column(
-            width=6,
-            style={'width': '50%',
+            width=5,
+            style={'width': '60%',
                    'display': 'inline-block',
                    'marginBottom': 0,
                    'marginTop': 0,
@@ -332,12 +371,16 @@ def parse_contents(contents, filename, last_modified):
      Input(component_id='concrete_quality', component_property='value'),
      Input(component_id='steel_quality', component_property='value'),
      Input(component_id='alpha_cc', component_property='value'),
+     Input(component_id='eccentricity', component_property='value'),
+     Input(component_id='cult-i', component_property='value'),
      Input(component_id='upload-data', component_property='contents')],
     [State(component_id='upload-data', component_property='filename'),
      State(component_id='upload-data', component_property='last_modified')]
 )
 def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
-                      f_ck, f_yk, alpha_cc, contents, filename, last_modified):
+                      f_ck, f_yk, alpha_cc, eccentricity, cult, contents,
+                      filename,
+                      last_modified):
     if filename is not None:
         try:
             x, y = parse_contents(contents, filename, last_modified)
@@ -349,14 +392,32 @@ def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
     else:
         return html.H3(['No data available'])
 
+    if eccentricity == 'yes':
+        ecc = True
+    else:
+        ecc= False
+
     values = core.int_diagram(h_=h, b_=b, d_1=d_1, d_2=d_2, gamma_c=gamma_c,
                               gamma_s=gamma_s, gamma_d=gamma_d, a_s1=a_s1,
                               a_s2=a_s2, f_ck=f_ck, f_yk=f_yk,
-                              alpha_cc=alpha_cc)
+                              alpha_cc=alpha_cc, eccentricity=ecc)
+    i_val, val = values
 
+    if cult == 'yes':
+        index = []
+        for m, n in zip(gamma_d*x/1000, gamma_d*y/1000):
+            index.append(cult_i.cult_I(m=m,
+                                       n=n,
+                                       input_values=i_val,
+                                       values=val)
+                         )
+        val['cult-I'] = index
+    values = (i_val, val)
     try:
         graph = dcc.Graph(
-                    figure=draw(val=values, x=gamma_d*x/1000, y=gamma_d*y/1000)
+                    figure=draw(values=values,
+                                x=gamma_d*x/1000,
+                                y=gamma_d*y/1000)
                 )
     except (NameError, TypeError) as e:
         print(e)

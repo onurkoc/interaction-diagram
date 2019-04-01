@@ -1,9 +1,9 @@
 import plotly.graph_objs as go
 import numpy as np
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 
 
-def draw(val: Tuple[dict], x: np.array, y: np.array):
+def draw(values: Tuple[Any,Any], x: np.array, y: np.array):
     """
     input::
     val: dict of capacity curves
@@ -14,7 +14,8 @@ def draw(val: Tuple[dict], x: np.array, y: np.array):
     """
     i_val: Dict[str, float]
     val: Dict[str, float]
-    i_val, val = val
+    i_val, val = values
+    ecc = i_val['eccentricity']  # eccentricity true or false
 
     hover_mom_pos = ['Moment: ' + '{:.2f}'.format(text_x) +
                      '<br>Normal force: ' + '{:.2f}'.format(text_y)
@@ -37,10 +38,19 @@ def draw(val: Tuple[dict], x: np.array, y: np.array):
                        for text_x, text_y in
                        zip(list(val['Moment Reinf Neg']),
                            list(val['Normal Force Reinf']))]
-
-    hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
+    try:
+        val['cult-I']
+    except Exception:
+        hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
                     '<br>Normal force: ' + '{:.2f}'.format(text_y) + ' [MN]'
                     for text_x, text_y in zip(list(x), list(y))]
+    else:
+        hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
+                        '<br>Normal force: ' + '{:.2f}'.format(text_y) +
+                        ' [MN]<br>CULT-I: {}'.format(index)
+                        for text_x, text_y, index in zip(list(x),
+                                                         list(y),
+                                                         val['cult-I'])]
 
     trace0 = go.Scatter(
         x=val['Moment'] + val['Moment Neg'][::-1],
@@ -118,6 +128,40 @@ def draw(val: Tuple[dict], x: np.array, y: np.array):
         )
     )
 
+    if ecc:
+        x1, y1 = val['x1_y1']
+        x1 = min(x1)
+        y1 = min(y1)
+        x2, y2 = val['x2_y2']
+        x2 = min(x2)
+        y2 = min(y2)
+        hover_ecc = ['Eccentricity:<br>' +
+                     'Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
+                     '<br>Normal force: ' + '{:.2f}'.format(text_y) + ' [MN]'
+                        for text_x, text_y in zip([x1, x2], [y1, y2])]
+        trace3 = go.Scatter(
+            x=[x1 ,x2],
+            y=[y1, y2],
+            mode='lines',
+            name='eccentricity',
+            showlegend=False,
+            line=dict(
+                color='gray',
+                dash='longdashdot',
+                width=1.5
+            ),
+            text=hover_ecc,
+            hoverinfo='text',
+            hoverlabel=dict(
+                bordercolor='gray',
+                bgcolor='lightgray',
+                font=dict(
+                    size=12,
+                    family='consolas'
+                )
+            )
+        )
+
     layout = go.Layout(
         plot_bgcolor='#f9f7f7',
         margin=dict(
@@ -132,8 +176,8 @@ def draw(val: Tuple[dict], x: np.array, y: np.array):
         ),
         hovermode='closest',
         autosize=True,
-        width=1200,
-        height=1000,
+        # width=1200,
+        height=900,
         xaxis=dict(
             rangemode='normal',
             tickformat='.2f',
@@ -156,16 +200,19 @@ def draw(val: Tuple[dict], x: np.array, y: np.array):
             traceorder='normal',
             font=dict(
                 family='arial',
-                size=14,
+                size=12,
                 color='#000'
             ),
             bgcolor='#E2E2E2',
             bordercolor='#FFFFFF',
-            borderwidth=2
+            borderwidth=1.5
         )
     )
 
-    data = [trace0, trace1, trace2]
+    if ecc:
+        data = [trace0, trace1, trace2, trace3]
+    else:
+        data = [trace0, trace1, trace2]
 
     return go.Figure(
         data=data,
@@ -177,9 +224,9 @@ if __name__ == '__main__':
     from plotly.offline import plot
     import core
     import csv_read
-    values = core.int_diagram()
+    values = core.int_diagram(eccentricity=True)
     data = r"C:\temp\ZSoil\Road_60\New_Tunnel\V3.3\Results" + \
            r"\SF_1.3_NoAbutment.csv"
     x, y = csv_read.read(data)
-    fig = draw(val=values, x=1.35*x/1000, y=1.35*y/1000)
+    fig = draw(values=values, x=1.35*x/1000, y=1.35*y/1000)
     plot(fig, filename='interaction_diagram.html')
