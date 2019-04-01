@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import pandas as pd
+import intersection as inter
 
 
 def int_diagram(h_=0.35,
@@ -14,7 +15,8 @@ def int_diagram(h_=0.35,
                 a_s2=5,
                 f_ck=40,
                 f_yk=500,
-                alpha_cc=1.00):
+                alpha_cc=1.00,
+                eccentricity=False):
 
     # epsilon values of the steel and the concrete
     # a. steel strains tension side
@@ -49,6 +51,11 @@ def int_diagram(h_=0.35,
     d = h_ - d_1
     a_s1_ = 0  # indicating naked concrete interaction line
     alpha_ = 1  # again for naked concrete interaction line
+
+    min_ecc = min(h_ / 30, 0.02)
+    # min eccentricity as defined in EN1992-1 6.1(4)
+    n_max = f_ck * b_ * d
+    m_min = min_ecc * n_max
 
     # mapping the epsilon values as pandas data frame
     df = pd.DataFrame({'eps_c': epsilon_c,
@@ -153,6 +160,51 @@ def int_diagram(h_=0.35,
     for i in range(len(moment_reinf)):
         moment_reinf_neg.append(float(abs(moment_reinf[i]) * -1))
 
+    if eccentricity:
+        # if user wants to visualize the eccentricity line
+        limit_line_pos_m = [m_min, m_min]
+        limit_line_neg_m = [-m_min, -m_min]
+        limit_line_n = [0, -n_max]
+
+        if a_s1 == 0 and a_s2 == 0:
+            # no reinforcements
+            x1, y1 = inter.intersection(np.array(limit_line_neg_m),
+                                        np.array(limit_line_n),
+                                        np.array(moment_neg),
+                                        np.array(n_force))
+            x2, y2 = inter.intersection(np.array(limit_line_pos_m),
+                                        np.array(limit_line_n),
+                                        np.array(moment),
+                                        np.array(n_force))
+        elif a_s1 != 0:
+            x1, y1 = inter.intersection(np.array(limit_line_neg_m),
+                                        np.array(limit_line_n),
+                                        np.array(moment_reinf_neg),
+                                        np.array(n_force_reinf))
+            if a_s2 == 0:
+                # only a_s1 defined
+                x2, y2 = inter.intersection(np.array(limit_line_pos_m),
+                                            np.array(limit_line_n),
+                                            np.array(moment),
+                                            np.array(n_force))
+            else:
+                # both of them defined
+                x2, y2 = inter.intersection(np.array(limit_line_pos_m),
+                                            np.array(limit_line_n),
+                                            np.array(moment_reinf),
+                                            np.array(n_force_reinf))
+        elif a_s2 != 0 and a_s1 == 0:
+            x1, y1 = inter.intersection(np.array(limit_line_pos_m),
+                                        np.array(limit_line_n),
+                                        np.array(moment),
+                                        np.array(n_force))
+            x2, y2 = inter.intersection(np.array(limit_line_pos_m),
+                                        np.array(limit_line_n),
+                                        np.array(moment_reinf),
+                                        np.array(n_force_reinf))
+        else:
+            raise Exception('Cannot calculate eccentricity')
+
     input_values = {'h': h_,
                     'b': b_,
                     'd_1': d_1,
@@ -164,20 +216,33 @@ def int_diagram(h_=0.35,
                     'a_s2': a_s2,
                     'f_ck': f_ck,
                     'f_yk': f_yk,
-                    'alpha_cc': alpha_cc}
-
-    values = {'Moment': moment,
-              'Moment Neg': moment_neg,
-              'Normal Force': n_force,
-              'Moment Reinf': moment_reinf,
-              'Moment Reinf Neg': moment_reinf_neg,
-              'Normal Force Reinf': n_force_reinf}
+                    'alpha_cc': alpha_cc,
+                    'eccentricity': eccentricity}
+    if eccentricity:
+        values = {'Moment': moment,
+                  'Moment Neg': moment_neg,
+                  'Normal Force': n_force,
+                  'Moment Reinf': moment_reinf,
+                  'Moment Reinf Neg': moment_reinf_neg,
+                  'Normal Force Reinf': n_force_reinf,
+                  'x1_y1': [x1, y1],
+                  'x2_y2': [x2, y2]}
+    else:
+        values = {'Moment': moment,
+                  'Moment Neg': moment_neg,
+                  'Normal Force': n_force,
+                  'Moment Reinf': moment_reinf,
+                  'Moment Reinf Neg': moment_reinf_neg,
+                  'Normal Force Reinf': n_force_reinf}
 
     return input_values, values
 
 
 if __name__ == '__main__':
-    i = int_diagram()  # initiate with default values
-    i['X'] = np.array([0, 100])
-    i['Y'] = np.array([0, -1000])
-    print(i['X']/10)
+    i_val, val = int_diagram(eccentricity=True)  # initiate with default values
+    # i['X'] = np.array([0, 100])
+    # i['Y'] = np.array([0, -1000])
+    print(val['x1_y1'])
+    print(val['x2_y2'])
+    print(max(np.array(val['Moment'])))
+    print(max(np.array(val['Moment Reinf'])))
