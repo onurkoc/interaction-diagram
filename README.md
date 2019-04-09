@@ -10,7 +10,7 @@ Works with Python 3.x
 Attention: Your file format should be .xlsx<br>
 ![Excel](https://github.com/onurkoc/interaction-diagram/blob/master/images/Excel.png)<br>
 Feed this file to the dashed region per drag & drop<br>
-- or feed a raw ZSoil .csv file per drag & drop to the dashed region
+- or feed a raw [ZSoil](www.zsoil.com) .csv file per drag & drop to the dashed region
 <br><br>
 
 The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in following scientific paper:<br>
