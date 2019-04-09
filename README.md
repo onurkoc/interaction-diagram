@@ -10,7 +10,7 @@ The concept CULT-I (Index for capacity utilization of linings in tunnels) is int
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Title: Performance indicator of tunnel linings under geotechnical uncertainty<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Authors: Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos<br>
 ### How does it work?
-- Either open up your Excel and type your normal force and moment values as shown below (they can be unlimited):<br>
+- Either open up your Excel and type your (characteristical) normal force (n) and moment values (m) as shown below (they can be unlimited):<br>
 Attention: Your file format should be .xlsx<br>
 ![Excel](https://github.com/onurkoc/interaction-diagram/blob/master/images/Excel.png)<br>
 Feed this file to the dashed region per drag & drop<br>
