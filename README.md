@@ -30,3 +30,6 @@ CULT-I is calculated using the following formula:<br>
 
 where<br>
 ![CULT-I](https://github.com/onurkoc/interaction-diagram/blob/master/images/Cult-I.png)<br>
+
+### License
+This project is licensed under the MIT License - see the [License](https://github.com/onurkoc/interaction-diagram/blob/master/LICENSE) for details
