@@ -11,6 +11,8 @@ The concept CULT-I (Index for capacity utilization of linings in tunnels) is int
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Authors: Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos<br>
 ## How does it work?
 Either:<br>
-- Open up your Excel and type your normal force and moment values as shown below:
-
-- or feed an raw ZSoil .csv file per drag & drop to the dashed region
+- Open up your Excel and type your normal force and moment values as shown below:<br>
+Attention: Your file ending should be in .xlxs<br>
+![Excel](https://github.com/onurkoc/interaction-diagram/blob/master/images/Excel.png)<br>
+Feed this file to the dashed region per drag & drop<br>
+- or feed a raw ZSoil .csv file per drag & drop to the dashed region
