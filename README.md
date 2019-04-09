@@ -3,6 +3,8 @@ The source code for an interaction diagram for reinforced concrete sections acco
 
 Works with Python 3.x
 
+![Main_Screen](https://github.com/onurkoc/interaction-diagram/blob/master/images/Main_Screen.png)
+
 👉 [View the Dash App](https://interaction-diagram.herokuapp.com/)
 
 ### How does it work?
