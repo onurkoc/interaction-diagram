@@ -3,7 +3,7 @@ The source code for an interaction diagram for reinforced concrete sections acco
 
 Works with Python 3.x
 
-👉 [Explore the App](https://interaction-diagram.herokuapp.com/)
+👉 [View the Dash App](https://interaction-diagram.herokuapp.com/)
 
 ### How does it work?
 - Either open up your Excel and type your (characteristical) normal force (n) and moment values (m) as shown below (they can be unlimited):<br>
