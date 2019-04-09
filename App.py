@@ -92,7 +92,8 @@ server = app.server
 
 
 app.layout = html.Div([
-    Header('Interaction Diagram acc. to EN1992-1'),
+    Header('Design of Reinforced Concrete Sections acc. to Eurocode 2 (EN '
+           '1992-1-1)'),
     Row([
         dcc.Upload(
             id='upload-data',
@@ -270,7 +271,7 @@ app.layout = html.Div([
                             style={'width': 150}
                         )
                     ]),
-                   html.Div([
+                    html.Div([
                        NamedRadioItems(
                            myId='eccentricity',
                            name='Limit capacity?',
@@ -281,8 +282,8 @@ app.layout = html.Div([
                            value='no',
                            labelStyle={'display': 'inline-block'}
                        )
-                   ]),
-                   html.Div([
+                    ]),
+                    html.Div([
                        NamedRadioItems(
                            myId='cult-i',
                            name='CULT-I?',
@@ -293,7 +294,7 @@ app.layout = html.Div([
                            value='yes',
                            labelStyle={'display': 'inline-block'}
                        )
-                   ])
+                    ])
                ]),
         Column(
             width=5,
@@ -395,7 +396,7 @@ def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
     if eccentricity == 'yes':
         ecc = True
     else:
-        ecc= False
+        ecc = False
 
     values = core.int_diagram(h_=h, b_=b, d_1=d_1, d_2=d_2, gamma_c=gamma_c,
                               gamma_s=gamma_s, gamma_d=gamma_d, a_s1=a_s1,
