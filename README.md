@@ -14,6 +14,10 @@ Attention: Your file format should be .xlsx<br>
 Feed this file to the dashed region per drag & drop<br>
 - or feed a raw [ZSoil](https://www.zsoil.com/) .csv file per drag & drop to the dashed region
 <br><br>
+### Limiting Capacity
+The limit of the capacity can also be activated using the radio buttons left below the screen.<br>
+See minimum eccentricity e0=h/30 > 20mm EN1992-1-1 §6.1 (4)
+<br><br>
 ### CULT-I
 The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in following scientific paper:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Published in: Geomechanics and Tunnelling 9 (2016), No.2<br>
