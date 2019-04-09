@@ -3,7 +3,7 @@ The source code for an interaction diagram for reinforced concrete sections acco
 
 Works with Python 3.x
 
-https://interaction-diagram.herokuapp.com/
+👉 [Explore the App](https://interaction-diagram.herokuapp.com/)
 
 The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in following scientific paper:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Published in: Geomechanics and Tunnelling 9 (2016), No.2<br>
