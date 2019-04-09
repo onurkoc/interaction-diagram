@@ -11,7 +11,7 @@ Attention: Your file format should be .xlsx<br>
 ![Excel](https://github.com/onurkoc/interaction-diagram/blob/master/images/Excel.png)<br>
 Feed this file to the dashed region per drag & drop<br>
 - or feed a raw ZSoil .csv file per drag & drop to the dashed region
-<br><br><br>
+<br><br>
 
 The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in following scientific paper:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Published in: Geomechanics and Tunnelling 9 (2016), No.2<br>
