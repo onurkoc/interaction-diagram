@@ -12,6 +12,7 @@ import base64
 import io
 import pandas as pd
 import cult_i
+from textwrap import dedent
 
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -306,7 +307,14 @@ app.layout = html.Div([
                    'marginRight': 0,
                    'padding': 0},
             children=[
-                html.Div(id='output-diagram')
+                html.Div(id='output-diagram'),
+                Row(id='Source Code',
+                    children=[
+                         dcc.Markdown(dedent(
+                         '''
+                         [Source Code](https://github.com/onurkoc/interaction-diagram)
+                         '''))]
+                    )
             ]
         ),
         Column(
