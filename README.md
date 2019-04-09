@@ -17,3 +17,8 @@ The concept CULT-I (Index for capacity utilization of linings in tunnels) is int
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Published in: Geomechanics and Tunnelling 9 (2016), No.2<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Title: **Performance indicator of tunnel linings under geotechnical uncertainty**<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Authors: Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos<br>
+
+CULT-I is calculated using following formula:<br>
+
+where<br>
+![CULT-I](https://github.com/onurkoc/interaction-diagram/blob/master/images/Cult-I.png)<br>
