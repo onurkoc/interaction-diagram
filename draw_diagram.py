@@ -3,7 +3,7 @@ import numpy as np
 from typing import Dict, Tuple, Any
 
 
-def draw(values: Tuple[Any,Any], x: np.array, y: np.array):
+def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
     """
     input::
     val: dict of capacity curves
@@ -42,8 +42,9 @@ def draw(values: Tuple[Any,Any], x: np.array, y: np.array):
         val['cult-I']
     except Exception:
         hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
-                    '<br>Normal force: ' + '{:.2f}'.format(text_y) + ' [MN]'
-                    for text_x, text_y in zip(list(x), list(y))]
+                        '<br>Normal force: ' + '{:.2f}'.format(text_y) +
+                        ' [MN]'
+                        for text_x, text_y in zip(list(x), list(y))]
     else:
         hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
                         '<br>Normal force: ' + '{:.2f}'.format(text_y) +
@@ -138,9 +139,9 @@ def draw(values: Tuple[Any,Any], x: np.array, y: np.array):
         hover_ecc = ['Eccentricity:<br>' +
                      'Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
                      '<br>Normal force: ' + '{:.2f}'.format(text_y) + ' [MN]'
-                        for text_x, text_y in zip([x1, x2], [y1, y2])]
+                     for text_x, text_y in zip([x1, x2], [y1, y2])]
         trace3 = go.Scatter(
-            x=[x1 ,x2],
+            x=[x1, x2],
             y=[y1, y2],
             mode='lines',
             name='eccentricity',
