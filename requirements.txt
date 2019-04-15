@@ -25,8 +25,8 @@ kiwisolver==1.0.1
 MarkupSafe==1.1.0
 matplotlib==3.0.2
 mccabe==0.6.1
-mkl-fft==1.0.10
-mkl-random==1.0.2
+mkl-fft
+mkl-random
 nbformat==4.4.0
 numpy==1.15.4
 pandas==0.23.4
