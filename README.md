@@ -1,7 +1,7 @@
 # Interaction Diagram according to Eurocode 2
 The source code for an interaction diagram for reinforced concrete sections according to EN 1992-1-1 is presented in this repository.
 
-Works with Python 3.x
+Works with Python > 3.5
 
 ![Main_Screen](https://github.com/onurkoc/interaction-diagram/blob/master/images/Main_Screen.png)
 
