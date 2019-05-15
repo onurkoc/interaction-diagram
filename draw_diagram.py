@@ -45,6 +45,7 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
                         '<br>Normal force: ' + '{:.2f}'.format(text_y) +
                         ' [MN]'
                         for text_x, text_y in zip(list(x), list(y))]
+        name_design_values = f'Design values'
     else:
         hover_design = ['Moment: ' + '{:.2f}'.format(text_x) + ' [MN.m]' +
                         '<br>Normal force: ' + '{:.2f}'.format(text_y) +
@@ -52,6 +53,9 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
                         for text_x, text_y, index in zip(list(x),
                                                          list(y),
                                                          val['cult-I'])]
+        # if cult-I index available, show min value of cult-I in legend
+        min_cult_I = min([i for i in val['cult-I'] if type(i) != str])
+        name_design_values = f'Design values<br>min cult-I: {min_cult_I}'
 
     trace0 = go.Scatter(
         x=val['Moment'] + val['Moment Neg'][::-1],
@@ -106,7 +110,7 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
         x=x,
         y=y,
         mode='markers',
-        name='Design values',
+        name=name_design_values,
         showlegend=True,
         marker=dict(
             color='red',
@@ -185,7 +189,7 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
             title='Moment [MN.m]',
             titlefont=dict(
                 size=18)
-            ),
+        ),
         yaxis=dict(
             scaleanchor='x',
             scaleratio=0.1,
@@ -194,7 +198,7 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
             title='Normal Force [MN]',
             titlefont=dict(
                 size=18)
-            ),
+        ),
         legend=dict(
             x=0.82,
             y=0.98,
@@ -219,15 +223,3 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
         data=data,
         layout=layout
     )
-
-
-if __name__ == '__main__':
-    from plotly.offline import plot
-    import core
-    import csv_read
-    values = core.int_diagram(eccentricity=True)
-    data = r"C:\temp\ZSoil\Road_60\New_Tunnel\V3.3\Results" + \
-           r"\SF_1.3_NoAbutment.csv"
-    x, y = csv_read.read(data)
-    fig = draw(values=values, x=1.35*x/1000, y=1.35*y/1000)
-    plot(fig, filename='interaction_diagram.html')
