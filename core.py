@@ -46,6 +46,9 @@ def int_diagram(h_=0.35,
     except ZeroDivisionError:
         # in case a_s2 defined as zero
         alpha = 0
+    if alpha_cc < 0.85:
+        # alpha_cc cannot be smaller than 0.85
+        alpha_cc = 0.85
     f_cd = f_ck / gamma_c * alpha_cc
     f_yd = f_yk / gamma_s
     d = h_ - d_1
