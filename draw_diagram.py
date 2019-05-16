@@ -53,9 +53,12 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
                         for text_x, text_y, index in zip(list(x),
                                                          list(y),
                                                          val['cult-I'])]
-        # if cult-I index available, show min value of cult-I in legend
-        min_cult_I = min([i for i in val['cult-I'] if type(i) != str])
-        name_design_values = f'Design values<br>min cult-I: {min_cult_I}'
+        try:
+            min_cult_I = min([i for i in val['cult-I'] if type(i) != str])
+        except Exception as e:
+            print(e)
+        else:
+            name_design_values = f'Design values<br>min cult-I: {min_cult_I}'
 
     trace0 = go.Scatter(
         x=val['Moment'] + val['Moment Neg'][::-1],
