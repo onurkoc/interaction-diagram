@@ -14,8 +14,6 @@ import pandas as pd
 import cult_i
 from textwrap import dedent
 
-# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
-
 
 def Header(title):
     return html.Div(
@@ -84,13 +82,9 @@ def NamedRadioItems(myId, name, **kwargs):
     )
 
 
-app = dash.Dash(__name__,
-                # external_scripts=external_js,
-                # external_stylesheets=external_stylesheets
-                )
+app = dash.Dash(__name__)
 
 server = app.server
-
 
 app.layout = html.Div([
     Header('Design of Reinforced Concrete Sections acc. to Eurocode 2 (EN '
