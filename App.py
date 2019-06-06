@@ -14,6 +14,8 @@ import pandas as pd
 import cult_i
 from textwrap import dedent
 
+# external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
 
 def Header(title):
     return html.Div(
@@ -45,11 +47,15 @@ def Column(children=None, width=1, **kwargs):
 
 def NamedDropdown(myId, name, **kwargs):
     return html.Div(
-        style={'margin': '10px 0px'},
+        style={'margin': '5px 0px',
+               'fontSize': 12,
+               'font-family': 'Arial'},
         children=[
             html.P(
                 children=f'{name}',
-                style={'margin-left': '3px'}
+                style={'margin-left': '0px',
+                       'fontSize': 12,
+                       'font-family': 'Arial'}
             ),
             dcc.Dropdown(id=myId, **kwargs)
         ]
@@ -58,11 +64,15 @@ def NamedDropdown(myId, name, **kwargs):
 
 def NamedInput(myId, name, **kwargs):
     return html.Div(
-        style={'margin': '10px 0px'},
+        style={'margin': '5px 0px',
+               'fontSize': 12,
+               'font-family': 'Arial'},
         children=[
             html.P(
                 children=f'{name}',
-                style={'margin-left': '3px'}
+                style={'margin-left': '0px',
+                       'fontSize': 12,
+                       'font-family': 'Arial'}
             ),
             dcc.Input(id=myId, **kwargs)
         ]
@@ -71,20 +81,39 @@ def NamedInput(myId, name, **kwargs):
 
 def NamedRadioItems(myId, name, **kwargs):
     return html.Div(
-        style={'margin': '10px 0px'},
+        style={'margin': '5px 0px',
+               'fontSize': 12,
+               'font-family': 'Arial'},
         children=[
             html.P(
                 children=f'{name}',
-                style={'margin-left': '3px'}
+                style={'margin-left': '0px',
+                       'fontSize': 12,
+                       'font-family': 'Arial'
+                       }
             ),
             dcc.RadioItems(id=myId, **kwargs)
         ]
     )
 
 
-app = dash.Dash(__name__)
+def type_casting(number):
+    """take the text input and type cast them into floating numbers"""
+    try:
+        number = float(number)
+    except Exception:
+        # exception occurs from comma utilization for decimal points
+        number = float(number.replace(',', '.'))
+    return number
+
+
+app = dash.Dash(__name__,
+                # external_scripts=external_js,
+                # external_stylesheets=external_stylesheets
+                )
 
 server = app.server
+
 
 app.layout = html.Div([
     Header('Design of Reinforced Concrete Sections acc. to Eurocode 2 (EN '
@@ -124,7 +153,7 @@ app.layout = html.Div([
                         NamedInput(
                             myId='height',
                             name='Height',
-                            type='number',
+                            type='text',
                             value=0.35,
                             style={'width': 150}
                         )
@@ -134,8 +163,8 @@ app.layout = html.Div([
                             myId='width',
                             name='Width',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            inputMode='numeric',
+                            type='text',
                             value=1.0,
                             style={'width': 150}
                         )
@@ -145,8 +174,7 @@ app.layout = html.Div([
                             myId='concrete_cover_top',
                             name='Concrete Cover, Top',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            type='text',
                             value=0.03,
                             style={'width': 150}
                         )
@@ -156,8 +184,7 @@ app.layout = html.Div([
                             myId='concrete_cover_bottom',
                             name='Concrete Cover, Bottom',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            type='text',
                             value=0.03,
                             style={'width': 150}
                         )
@@ -238,8 +265,7 @@ app.layout = html.Div([
                             myId='reinforcement_area_top',
                             name='Reinforcement Area, Top',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            type='text',
                             value=2.58,
                             style={'width': 150}
                         )
@@ -249,8 +275,7 @@ app.layout = html.Div([
                             myId='reinforcement_area_bottom',
                             name='Reinforcement Area, Bottom',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            type='text',
                             value=2.58,
                             style={'width': 150}
                         )
@@ -260,8 +285,7 @@ app.layout = html.Div([
                             myId='alpha_cc',
                             name='Alpha cc',
                             placeholder='Enter a value...',
-                            inputmode='numeric',
-                            type='number',
+                            type='text',
                             value=1.00,
                             style={'width': 150}
                         )
@@ -384,6 +408,17 @@ def update_output_fig(h, b, d_1, d_2, gamma_c, gamma_s, gamma_d, a_s1, a_s2,
                       f_ck, f_yk, alpha_cc, eccentricity, cult, contents,
                       filename,
                       last_modified):
+    # type casting text into floating numbers:
+    h = type_casting(h)
+    b = type_casting(b)
+    d_1 = type_casting(d_1)
+    d_2 = type_casting(d_2)
+    gamma_c = type_casting(gamma_c)
+    gamma_s = type_casting(gamma_s)
+    a_s1 = type_casting(a_s1)
+    a_s2 = type_casting(a_s2)
+    alpha_cc = type_casting(alpha_cc)
+
     if filename is not None:
         try:
             x, y = parse_contents(contents, filename, last_modified)
