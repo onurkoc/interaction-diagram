@@ -56,7 +56,7 @@ def draw(values: Tuple[Any, Any], x: np.array, y: np.array):
         try:
             min_cult_I = min([i for i in val['cult-I'] if type(i) != str])
         except Exception as e:
-            print(e)
+            # print(e)
             name_design_values = f'Design values'
         else:
             name_design_values = f'Design values<br>min cult-I: {min_cult_I}'
