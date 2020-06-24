@@ -19,7 +19,7 @@ The limit of the capacity can also be activated using the radio buttons left bel
 See minimum eccentricity e0=h/30 > 20mm EN1992-1-1 §6.1 (4)
 <br><br>
 ### CULT-I
-The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in following scientific paper:<br>
+The concept CULT-I (Index for capacity utilization of linings in tunnels) is introduced in the following scientific paper:<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Published in: Geomechanics and Tunnelling 9 (2016), No.2<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Title: **Performance indicator of tunnel linings under geotechnical uncertainty**<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Authors: Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos<br>
