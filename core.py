@@ -10,7 +10,6 @@ def int_diagram(h_=0.35,
                 d_2=0.03,
                 gamma_c=1.50,
                 gamma_s=1.15,
-                gamma_d=1.35,
                 a_s1=5,
                 a_s2=5,
                 f_ck=40,
@@ -75,7 +74,7 @@ def int_diagram(h_=0.35,
         y = df.eps_c[i]
 
         if d <= 0 or a_s1 < 0 or a_s2 < 0 or b_ <= 0 or gamma_c < 0 or \
-           gamma_d < 0 or gamma_s < 0 or d_1 < 0 or d_2 < 0 or alpha_cc <= 0:
+           gamma_s < 0 or d_1 < 0 or d_2 < 0 or alpha_cc <= 0:
             # parameter problems returns NoneType
             return
 
@@ -214,7 +213,6 @@ def int_diagram(h_=0.35,
                     'd_2': d_2,
                     'gamma_c': gamma_c,
                     'gamma_s': gamma_s,
-                    'gamma_d': gamma_d,
                     'a_s1': a_s1,
                     'a_s2': a_s2,
                     'f_ck': f_ck,
