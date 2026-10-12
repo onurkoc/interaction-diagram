@@ -278,3 +278,34 @@ test('N4: several intersection points do not raise an error', () => {
     // the corner itself is on the curve: M_rel,i = 0, N_rel,i = 0
     assert.equal(cult_I(1, -1, input_values, values), 0);
 });
+
+test('N9: distance to the ends of the curve for m = 0', () => {
+    // Simple curve (rhombus) from N = -2 (compression) to N = +1 (tension)
+    const values = {
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0, 1, 0],
+        'Normal Force Reinf': [-2, -0.5, 1],
+        'Moment Reinf Neg': [0, -1, 0],
+        'Normal Force Reinf Neg': [-2, -0.5, 1],
+    };
+    const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
+    // M_rel,max = 1, N_rel,max = 3 / 2 (rule of cult_i.py, see N10)
+    // m = 0: M_rel,i = M_rel,max = 1
+    /** @param {number} n_rel_i */
+    const expected = (n_rel_i) =>
+        Math.sqrt((1 ** 2 + n_rel_i ** 2) / (1 ** 2 + 1.5 ** 2));
+
+    // n = -0.25: 1.75 to the compression end, 1.25 to the tension end
+    const result_1 = /** @type {number} */ (
+        cult_I(0, -0.25, input_values, values));
+    assert.ok(Math.abs(result_1 - expected(1.25)) <= 0.0005);
+    // n = -1.5: 0.5 to the compression end, 2.5 to the tension end
+    const result_2 = /** @type {number} */ (
+        cult_I(0, -1.5, input_values, values));
+    assert.ok(Math.abs(result_2 - expected(0.5)) <= 0.0005);
+    // n = +0.5 (tension): 2.5 to the compression end, 0.5 to the tension end
+    const result_3 = /** @type {number} */ (
+        cult_I(0, 0.5, input_values, values));
+    assert.ok(Math.abs(result_3 - expected(0.5)) <= 0.0005);
+});
