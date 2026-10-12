@@ -58,3 +58,34 @@ test('E6: eta_t other than 1.0 / 0.85 / 1.2 is rejected (SIA)', () => {
                   /eta_t/);
     assert.throws(() => int_diagram({ f_ck: 30 }, sia262), /eta_t/);
 });
+
+test('E10/D7: plain concrete section uses the reduced f_cd', () => {
+    // with reinforcement: concrete curve with the normal f_cd
+    const reinforced = { f_ck: 30, a_s1: 5, a_s2: 5 };
+    const plain = { f_ck: 30, a_s1: 0, a_s2: 0 };
+
+    // EN: alpha_cc_pl / alpha_cc = 0.8 / 1.0, SIA: factor 0.8
+    const cases = [
+        { norm: en1992, extra: { alpha_cc: 1.0, alpha_cc_pl: 0.8 } },
+        { norm: sia262, extra: { eta_t: 0.85 } },
+    ];
+    for (const { norm, extra } of cases) {
+        const normal = curves({ ...reinforced, ...extra }, norm);
+        const reduced = curves({ ...plain, ...extra }, norm);
+        const expected = normal['Normal Force'].map(
+            (/** @type {number} */ n) => 0.8 * n);
+        assertClose(reduced['Normal Force'], expected, norm.name);
+        // without reinforcement both curves are the same
+        assertClose(reduced['Normal Force Reinf'], reduced['Normal Force'],
+                    norm.name);
+    }
+});
+
+test('E10/D7: alpha_cc_pl is editable (EN)', () => {
+    const plain = { f_ck: 30, a_s1: 0, a_s2: 0 };
+    const values_08 = curves({ ...plain, alpha_cc_pl: 0.8 });
+    const values_06 = curves({ ...plain, alpha_cc_pl: 0.6 });
+    const expected = values_08['Normal Force'].map(
+        (/** @type {number} */ n) => 0.6 / 0.8 * n);
+    assertClose(values_06['Normal Force'], expected, 'Normal Force');
+});

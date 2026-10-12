@@ -20,6 +20,8 @@ export function loadReference() {
  */
 export const WAITING_FOR_REFERENCE = {
     'alpha_cc_080_raised_to_085': 'E5',
+    'no_reinforcement': 'E10',
+    'no_reinforcement_eccentricity': 'E10',
 };
 
 /**

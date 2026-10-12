@@ -100,7 +100,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E5 | umgesetzt: α_cc wird nicht mehr still auf 0,85 angehoben; Bereichsprüfung mit E6 |
 | E1 | umgesetzt: e0 = max(h/30; 20 mm) |
 | E6 (D4) | umgesetzt: `int_diagram()` lehnt f_ck > 50, α_cc ausserhalb 0,8–1,0 und unzulässiges η_t mit Fehler ab |
-| E10 (D7) | offen |
+| E10 (D7) | umgesetzt im Rechenkern; Hinweis und Legende folgen mit der Oberfläche |
 | N1 | offen |
 | E2 (D1), damit C1 und N7 | offen |
 | E3 (D2, D5) + N2, damit C4 | offen |
