@@ -42,15 +42,17 @@ import { intersection } from './intersection.js';
 
 /**
  * Capacity curves, moments in MNm, normal forces in MN.
- * @typedef {Object} Values
- * @property {number[]} Moment
- * @property {number[]} "Moment Neg"
- * @property {number[]} "Normal Force"
- * @property {number[]} "Moment Reinf"
- * @property {number[]} "Moment Reinf Neg"
- * @property {number[]} "Normal Force Reinf"
- * @property {[number[], number[]]} [x1_y1]  only with eccentricity
- * @property {[number[], number[]]} [x2_y2]  only with eccentricity
+ * x1_y1 and x2_y2 exist only with eccentricity.
+ * @typedef {{
+ *     'Moment': number[],
+ *     'Moment Neg': number[],
+ *     'Normal Force': number[],
+ *     'Moment Reinf': number[],
+ *     'Moment Reinf Neg': number[],
+ *     'Normal Force Reinf': number[],
+ *     'x1_y1'?: [number[], number[]],
+ *     'x2_y2'?: [number[], number[]],
+ * }} Values
  */
 
 /**
@@ -322,6 +324,11 @@ export function int_diagram({
     /** @type {Values} */
     let values;
     if (eccentricity) {
+        if (x1 === undefined || y1 === undefined ||
+            x2 === undefined || y2 === undefined) {
+            // cannot happen, only for the type check
+            throw new Error('Cannot calculate eccentricity');
+        }
         values = {
             'Moment': moment,
             'Moment Neg': moment_neg,
