@@ -2,11 +2,9 @@
 /*
 M-N interaction diagram of a rectangular reinforced concrete section
 Port of legacy/core.py, parametrized with a norm configuration (norms/).
-With the default norm (EN 1992-1-1, legacy strain planes) the results
-are the same as in Python. The calculation is NOT corrected here,
-known problems are listed in NOTES.md.
+The problems found in core.py are corrected step by step,
+see NOTES.md (sections 4 and 5).
 */
-import { intersection } from './intersection.js';
 import { en1992 } from './norms/en1992.js';
 import { strain_planes } from './strain_planes.js';
 
@@ -28,7 +26,8 @@ import { strain_planes } from './strain_planes.js';
  * @property {number} [alpha_cc]  EN only
  * @property {number} [alpha_cc_pl]  EN only, plain concrete
  * @property {number} [eta_t]  SIA only, no preset
- * @property {boolean} [eccentricity]
+ * @property {boolean} [eccentricity]  minimum eccentricity for the
+ *     load points (EN only), see min_eccentricity_moments
  */
 
 /**
@@ -50,7 +49,6 @@ import { strain_planes } from './strain_planes.js';
 
 /**
  * Capacity curves, moments in MNm, normal forces in MN.
- * x1_y1 and x2_y2 exist only with eccentricity.
  * @typedef {{
  *     'Moment': number[],
  *     'Moment Neg': number[],
@@ -58,8 +56,6 @@ import { strain_planes } from './strain_planes.js';
  *     'Moment Reinf': number[],
  *     'Moment Reinf Neg': number[],
  *     'Normal Force Reinf': number[],
- *     'x1_y1'?: [number[], number[]],
- *     'x2_y2'?: [number[], number[]],
  * }} Values
  */
 
@@ -277,19 +273,10 @@ export function int_diagram({
     const f_yd = norm.f_yd(norm_params);
     const d = h_ - d_1;
 
-    let n_max = 0;
-    let m_min = 0;
-    if (norm.min_eccentricity === null) {
-        if (eccentricity) {
-            // no silent correction of the input
-            throw new Error(`${norm.name}: keine Mindestausmitte, ` +
-                            'die Option ist in diesem Modus nicht zulässig.');
-        }
-    } else {
-        const min_ecc = norm.min_eccentricity(h_);
-        // min eccentricity as defined in EN1992-1 6.1(4)
-        n_max = f_ck * b_ * d;
-        m_min = min_ecc * n_max;
+    if (norm.min_eccentricity === null && eccentricity) {
+        // no silent correction of the input
+        throw new Error(`${norm.name}: keine Mindestausmitte, ` +
+                        'die Option ist in diesem Modus nicht zulässig.');
     }
 
     if (d <= 0 || a_s1 < 0 || a_s2 < 0 || b_ <= 0 || gamma_c < 0 ||
@@ -320,55 +307,6 @@ export function int_diagram({
         moment_reinf_neg.push(Math.abs(moment_reinf[i]) * -1);
     }
 
-    let x1, y1, x2, y2;
-    if (eccentricity) {
-        // if user wants to visualize the eccentricity line
-        const limit_line_pos_m = [m_min, m_min];
-        const limit_line_neg_m = [-m_min, -m_min];
-        const limit_line_n = [0, -n_max];
-
-        if (a_s1 === 0 && a_s2 === 0) {
-            // no reinforcements
-            [x1, y1] = intersection(limit_line_neg_m,
-                                    limit_line_n,
-                                    moment_neg,
-                                    n_force);
-            [x2, y2] = intersection(limit_line_pos_m,
-                                    limit_line_n,
-                                    moment,
-                                    n_force);
-        } else if (a_s1 !== 0) {
-            [x1, y1] = intersection(limit_line_neg_m,
-                                    limit_line_n,
-                                    moment_reinf_neg,
-                                    n_force_reinf);
-            if (a_s2 === 0) {
-                // only a_s1 defined
-                [x2, y2] = intersection(limit_line_pos_m,
-                                        limit_line_n,
-                                        moment,
-                                        n_force);
-            } else {
-                // both of them defined
-                [x2, y2] = intersection(limit_line_pos_m,
-                                        limit_line_n,
-                                        moment_reinf,
-                                        n_force_reinf);
-            }
-        } else if (a_s2 !== 0 && a_s1 === 0) {
-            [x1, y1] = intersection(limit_line_pos_m,
-                                    limit_line_n,
-                                    moment,
-                                    n_force);
-            [x2, y2] = intersection(limit_line_pos_m,
-                                    limit_line_n,
-                                    moment_reinf,
-                                    n_force_reinf);
-        } else {
-            throw new Error('Cannot calculate eccentricity');
-        }
-    }
-
     /** @type {InputValues} */
     const input_values = {
         'h': h_,
@@ -386,33 +324,41 @@ export function int_diagram({
         'eccentricity': eccentricity,
     };
     /** @type {Values} */
-    let values;
-    if (eccentricity) {
-        if (x1 === undefined || y1 === undefined ||
-            x2 === undefined || y2 === undefined) {
-            // cannot happen, only for the type check
-            throw new Error('Cannot calculate eccentricity');
-        }
-        values = {
-            'Moment': moment,
-            'Moment Neg': moment_neg,
-            'Normal Force': n_force,
-            'Moment Reinf': moment_reinf,
-            'Moment Reinf Neg': moment_reinf_neg,
-            'Normal Force Reinf': n_force_reinf,
-            'x1_y1': [x1, y1],
-            'x2_y2': [x2, y2],
-        };
-    } else {
-        values = {
-            'Moment': moment,
-            'Moment Neg': moment_neg,
-            'Normal Force': n_force,
-            'Moment Reinf': moment_reinf,
-            'Moment Reinf Neg': moment_reinf_neg,
-            'Normal Force Reinf': n_force_reinf,
-        };
-    }
+    const values = {
+        'Moment': moment,
+        'Moment Neg': moment_neg,
+        'Normal Force': n_force,
+        'Moment Reinf': moment_reinf,
+        'Moment Reinf Neg': moment_reinf_neg,
+        'Normal Force Reinf': n_force_reinf,
+    };
 
     return [input_values, values];
+}
+
+/**
+ * Minimum eccentricity applied to one load point
+ * (EN 1992-1-1 6.1 (4), decision D1).
+ * For a point with compression the moment is at least e0 * |n|:
+ *     m_mod = sign(m) * max(|m|, e0 * |n|)
+ * For m = 0 both signs are returned, the less favourable one governs.
+ * The resistance curve is not changed.
+ * @param {number} m  moment of the load point [MNm]
+ * @param {number} n  normal force of the load point [MN], compression < 0
+ * @param {number} e0  minimum eccentricity [m]
+ * @returns {number[]} modified moment, or [+m_mod, -m_mod] for m = 0
+ */
+export function min_eccentricity_moments(m, n, e0) {
+    if (n >= 0) {
+        // no compression
+        return [m];
+    }
+    const m_min = e0 * Math.abs(n);
+    if (m === 0) {
+        return [m_min, -m_min];
+    }
+    if (Math.abs(m) >= m_min) {
+        return [m];
+    }
+    return [sign(m) * m_min];
 }

@@ -102,7 +102,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E6 (D4) | umgesetzt: `int_diagram()` lehnt f_ck > 50, α_cc ausserhalb 0,8–1,0 und unzulässiges η_t mit Fehler ab |
 | E10 (D7) | umgesetzt im Rechenkern; Hinweis und Legende folgen mit der Oberfläche |
 | N1 | umgesetzt: Druckbewehrung = a_s2 |
-| E2 (D1), damit C1 und N7 | offen |
+| E2 (D1), damit C1 und N7 | umgesetzt im Rechenkern (`min_eccentricity_moments`, `cult_I_min_eccentricity`); Strahl M = ±e0·N und Tabelle folgen mit der Oberfläche |
 | E3 (D2, D5) + N2, damit C4 | offen |
 | C2 | offen |
 | C3 | offen |

@@ -5,6 +5,7 @@ CULT-I, capacity utilization of linings in tunnels
 known problems are listed in NOTES.md.
 */
 import { intersection } from './intersection.js';
+import { min_eccentricity_moments } from './core.js';
 
 /** @typedef {import('./core.js').InputValues} InputValues */
 /** @typedef {import('./core.js').Values} Values */
@@ -161,4 +162,34 @@ export function cult_I(m, n, input_values, values) {
     const cult_I = Math.sqrt((m_rel_i * m_rel_i + n_rel_i * n_rel_i) / (
         m_rel_max * m_rel_max + n_rel_max * n_rel_max));
     return round3(cult_I);
+}
+
+/**
+ * CULT-I of a load point with the minimum eccentricity
+ * (EN 1992-1-1 6.1 (4), decision D1).
+ * The moment is modified with min_eccentricity_moments. For m = 0 both
+ * signs are checked and the less favourable result governs
+ * ('outside', otherwise the smaller CULT-I).
+ * @param {number} m  moment of the load point
+ * @param {number} n  normal force of the load point
+ * @param {number} e0  minimum eccentricity [m]
+ * @param {InputValues} input_values
+ * @param {Values} values
+ * @returns {{moments: number[], cult_I: number | 'outside'}}
+ *     moments: the modified moment(s) used for the check
+ */
+export function cult_I_min_eccentricity(m, n, e0, input_values, values) {
+    const moments = min_eccentricity_moments(m, n, e0);
+    /** @type {number | 'outside'} */
+    let governing = 'outside';
+    for (let i = 0; i < moments.length; i++) {
+        const result = cult_I(moments[i], n, input_values, values);
+        if (result === 'outside') {
+            return { moments: moments, cult_I: 'outside' };
+        }
+        if (i === 0 || (governing !== 'outside' && result < governing)) {
+            governing = result;
+        }
+    }
+    return { moments: moments, cult_I: governing };
 }
