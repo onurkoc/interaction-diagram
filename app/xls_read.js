@@ -70,7 +70,8 @@ function to_number(cell, row) {
         value = Number(cell.trim());
     }
     if (!Number.isFinite(value)) {
-        throw new Error(`Zeile ${row}: «${cell}» ist keine Zahl.`);
+        throw new Error(`Zeile ${row}: «${cell}» ist keine Zahl. ` +
+                        'Zelle als Zahl formatieren.');
     }
     return value;
 }
