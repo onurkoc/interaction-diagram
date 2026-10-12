@@ -220,3 +220,20 @@ test('N2: unsymmetric section, both sides meet at the end points', () => {
     // more reinforcement on the a_s2 side: the end points are not at M = 0
     assert.ok(Math.abs(values['Moment Reinf'][last]) > 1e-3);
 });
+
+test('C3: a point with m = 0 beyond the curve is outside', () => {
+    const result = int_diagram({});
+    assert.notEqual(result, null);
+    const [input_values, values] = /** @type {any} */ (result);
+    const n_compression = Math.min(...values['Normal Force Reinf']);
+    const n_tension = Math.max(...values['Normal Force Reinf']);
+
+    assert.equal(cult_I(0, n_compression - 0.1, input_values, values),
+                 'outside');
+    assert.equal(cult_I(0, n_tension + 0.1, input_values, values),
+                 'outside');
+    assert.equal(cult_I(0, -20, input_values, values), 'outside');
+    // inside: a number
+    assert.equal(typeof cult_I(0, n_compression / 2, input_values, values),
+                 'number');
+});

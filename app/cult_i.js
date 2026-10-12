@@ -131,7 +131,8 @@ export function cult_I(m, n, input_values, values) {
         m_rel_i = m_rel_max;
         n_rel_i = Math.min(Math.abs(min(limit_y)) - Math.abs(n),
                            max(limit_y) - Math.abs(n));
-        if (max(limit_y) < n && n < min(limit_y)) {
+        if (n > max(limit_y) || n < min(limit_y)) {
+            // beyond pure tension or beyond centric compression
             return 'outside';
         }
     } else {
