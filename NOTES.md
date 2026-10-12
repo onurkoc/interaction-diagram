@@ -106,7 +106,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. commercial program-Vergleich (D6) bestanden, siehe Abschnitt 6. |
 | C2 | erledigt mit dem Port: In `cult_i.js` ist das Ergebnis an dieser Stelle immer eine Zahl, die Typabfrage entfällt. Keine Änderung der Rechnung. |
 | C3 | umgesetzt: Bei m = 0 ist ein Punkt jenseits von reinem Zug oder zentrischem Druck «outside» |
-| N3 | offen |
+| N3 | umgesetzt: CULT-I verwendet auf beiden Seiten die bewehrte Kurve mit ihren eigenen Normalkräften |
 | N4 | offen |
 | N5, N6 | offen, mit der Oberfläche |
 | N8 | offen, mit dem Datei-Import |

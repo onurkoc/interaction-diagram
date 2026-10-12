@@ -62,31 +62,20 @@ function round3(x) {
  * @returns {number | 'outside'}
  */
 export function cult_I(m, n, input_values, values) {
-    let limit_x_pos, limit_y, n_rel_max, m_rel_max;
+    // The curves with reinforcement are the resistance on both sides.
+    // Without reinforcement they are the same as the concrete curves.
+    const limit_x_pos = values['Moment Reinf'];
+    const limit_y = values['Normal Force Reinf'];
+    const limit_x_neg = values['Moment Reinf Neg'];
+    const limit_y_neg = values['Normal Force Reinf Neg'];
+
+    let n_rel_max;
     if (input_values['a_s1'] === 0) {
-        limit_x_pos = values['Moment'];
-        limit_y = values['Normal Force'];
         n_rel_max = Math.abs(min(limit_y) - max(limit_y));
-        m_rel_max = Math.abs(max(limit_x_pos));
     } else {
-        limit_x_pos = values['Moment Reinf'];
-        limit_y = values['Normal Force Reinf'];
         n_rel_max = Math.abs(min(limit_y) - max(limit_y)) / 2;  // take the half
-        m_rel_max = Math.abs(max(limit_x_pos));
     }
-    let limit_x_neg;
-    if (input_values['a_s2'] === 0) {
-        limit_x_neg = values['Moment Neg'];
-    } else {
-        limit_x_neg = values['Moment Reinf Neg'];
-    }
-    // normal forces of the left side, chosen like limit_y above
-    let limit_y_neg;
-    if (input_values['a_s1'] === 0) {
-        limit_y_neg = values['Normal Force Neg'];
-    } else {
-        limit_y_neg = values['Normal Force Reinf Neg'];
-    }
+    const m_rel_max = Math.abs(max(limit_x_pos));
 
     const horizontal_cut_x = [min(limit_x_neg),
                               max(limit_x_pos)];
