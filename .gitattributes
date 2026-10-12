@@ -1,0 +1,2 @@
+# third-party files are stored exactly as downloaded
+app/vendor/** -text

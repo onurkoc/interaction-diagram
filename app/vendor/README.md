@@ -1,0 +1,14 @@
+# vendor
+
+Third-party libraries, stored locally (no CDN at runtime). Not changed.
+
+| File | Library | Version | Source | License |
+|---|---|---|---|---|
+| `xlsx.mjs` | SheetJS Community Edition (ES module build) | 0.20.3 | <https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs> | Apache-2.0, see `xlsx.LICENSE` |
+
+SHA-256 of `xlsx.mjs`:
+`1A0FB062EE9781B13F6687371B202AAEFC53B6CE55B530C027E01F9C087B77DB`
+
+The files in this folder are excluded from the type check
+(`jsconfig.json`). The app code does not import them directly: the
+library is passed as an argument (see `app/xls_read.js`).
