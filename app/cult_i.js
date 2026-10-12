@@ -1,8 +1,8 @@
 // @ts-check
 /*
 CULT-I, capacity utilization of linings in tunnels
-1:1 port of legacy/cult_i.py. The calculation is NOT corrected here,
-known problems are listed in NOTES.md.
+Port of legacy/cult_i.py. The problems found in cult_i.py are
+corrected step by step, see NOTES.md (sections 4 and 5).
 */
 import { intersection } from './intersection.js';
 import { min_eccentricity_moments } from './core.js';
@@ -97,15 +97,12 @@ export function cult_I(m, n, input_values, values) {
         if (x1.length === 0 || y2.length === 0) {
             return 'outside';
         }
-        if (x1.length > 1) {
-            // Python: "if m_rel_i < 0" with an array of several values
-            // raises a ValueError (NOTES.md, N4)
-            throw new Error('The truth value of an array with more than ' +
-                            'one element is ambiguous.');
-        }
-        m_rel_i = x1[0] - m;
+        // several intersection points (e.g. the cut goes through a point
+        // of the curve): the outermost one is the limit
+        m_rel_i = max(x1) - m;
         if (y2.length > 1) {
-            n_rel_i = Math.min(Math.abs(y2[0] - n), Math.abs(y2[1] - n));
+            // the nearest of all intersection points
+            n_rel_i = min(y2.map(y => Math.abs(y - n)));
         } else {
             n_rel_i = Math.abs(y2[0] - n);
             if (n_rel_i > n_rel_max) {
@@ -136,15 +133,11 @@ export function cult_I(m, n, input_values, values) {
         if (x1.length === 0 || y2.length === 0) {
             return 'outside';
         }
-        if (x1.length > 1) {
-            // Python: "if m_rel_i > 0" with an array of several values
-            // raises a ValueError (NOTES.md, N4)
-            throw new Error('The truth value of an array with more than ' +
-                            'one element is ambiguous.');
-        }
-        m_rel_i = x1[0] - m;
+        // several intersection points: the outermost one is the limit
+        m_rel_i = min(x1) - m;
         if (y2.length > 1) {
-            n_rel_i = Math.min(Math.abs(y2[0] - n), Math.abs(y2[1] - n));
+            // the nearest of all intersection points
+            n_rel_i = min(y2.map(y => Math.abs(y - n)));
         } else {
             n_rel_i = Math.abs(y2[0] - n);
             if (n_rel_i > n_rel_max) {

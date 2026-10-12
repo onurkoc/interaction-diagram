@@ -255,3 +255,26 @@ test('N3: CULT-I uses the curves with reinforcement on both sides', () => {
         }
     }
 });
+
+test('N4: several intersection points do not raise an error', () => {
+    // Simple curve (rhombus) with corners at N = -1. A cut at n = -1
+    // goes exactly through a corner and hits two segments.
+    const values = {
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0, 1, 0],
+        'Normal Force Reinf': [-2, -1, 0],
+        'Moment Reinf Neg': [0, -1, 0],
+        'Normal Force Reinf Neg': [-2, -1, 0],
+    };
+    const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
+
+    // M_rel,max = 1, N_rel,max = 2 / 2 = 1
+    // point (0.5, -1): M_rel,i = 1 - 0.5, N_rel,i = 0.5 (curve at m = 0.5
+    // is at N = -1.5 and N = -0.5)
+    const expected = Math.sqrt((0.5 ** 2 + 0.5 ** 2) / (1 ** 2 + 1 ** 2));
+    assert.equal(cult_I(0.5, -1, input_values, values), expected);
+    assert.equal(cult_I(-0.5, -1, input_values, values), expected);
+    // the corner itself is on the curve: M_rel,i = 0, N_rel,i = 0
+    assert.equal(cult_I(1, -1, input_values, values), 0);
+});
