@@ -4,3 +4,8 @@ venv
 .env
 .idea
 .vscode
+
+# local working files and project data, not for the public repo
+CLAUDE.md
+STATUS.md
+commercial program/
