@@ -98,7 +98,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | Befund | Stand |
 |---|---|
 | E5 | umgesetzt: α_cc wird nicht mehr still auf 0,85 angehoben |
-| E1 | offen |
+| E1 | umgesetzt: e0 = max(h/30; 20 mm) |
 | E6 (D4) | offen |
 | E10 (D7) | offen |
 | N1 | offen |
