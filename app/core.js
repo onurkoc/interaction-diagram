@@ -273,7 +273,14 @@ export function int_diagram({
     if (messages.length > 0) {
         throw new Error(`${norm.name}: ${messages.join(' ')}`);
     }
-    const f_cd = norm.f_cd(norm_params);
+    let f_cd;
+    if (a_s1 === 0 && a_s2 === 0) {
+        // plain concrete section: reduced strength (D7)
+        f_cd = norm.f_cd_plain(norm_params);
+    } else {
+        // with reinforcement the concrete curve is only a comparison line
+        f_cd = norm.f_cd(norm_params);
+    }
     const f_yd = norm.f_yd(norm_params);
     const d = h_ - d_1;
 
