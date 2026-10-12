@@ -79,6 +79,8 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 | N5 | core.py: Parameterprüfung | Steht in der Schleife, nach der Division durch `gamma_c`. `gamma_c = 0` gibt einen Absturz statt `None`. |
 | N6 | draw_diagram.py: Legende | Zeigt f_cd = f_ck/γ_c ohne α_cc. |
 | N7 | draw_diagram.py: Ausmitte-Linie | `min()` auf leerem Schnittpunkt-Array stürzt ab, wenn die Linie die Kurve nicht trifft. |
+| N9 | cult_i.py: `min(abs(min(limit_y)) - abs(n), max(limit_y) - abs(n))` (Zweig m = 0 und Ersatzwert bei nur einem Schnittpunkt) | Der Abstand zur Zugseite wird als N_max − \|n\| gerechnet. Für Druck (n < 0) wäre der Abstand N_max − n = N_max + \|n\|. Stimmt nur, wenn N_max = 0 ist (unbewehrt). Mit Bewehrung wird der Wert negativ und geht quadriert in CULT-I ein. Nicht korrigiert, Entscheid offen. |
+| N10 | cult_i.py: `n_rel_max` | Bei a_s1 = 0 die ganze Spanne der Normalkraft, sonst die halbe. Das Bild im README (aus der Publikation) zeigt N_rel,max als halbe Spanne. Die Regel hängt nur an a_s1, nicht an a_s2; ein gespiegelter Querschnitt gibt deshalb für den gespiegelten Lastpunkt ein anderes CULT-I. Nicht korrigiert, Entscheid offen. |
 | N8 | xls_read.py: Spaltensuche | Über `'n' in name` und `'m' in name`: Ein Kopf «Moment» trifft beide. Funktioniert nur mit den Köpfen `n` und `m`. |
 
 ## 5 Entscheide und Stand der Korrekturen
@@ -108,6 +110,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | C3 | umgesetzt: Bei m = 0 ist ein Punkt jenseits von reinem Zug oder zentrischem Druck «outside» |
 | N3 | umgesetzt: CULT-I verwendet auf beiden Seiten die bewehrte Kurve mit ihren eigenen Normalkräften |
 | N4 | umgesetzt: Bei mehreren Schnittpunkten gilt der äusserste (M-Richtung) bzw. der nächste (N-Richtung), kein Abbruch mehr |
+| N9, N10 | offen, Entscheid nötig |
 | N5, N6 | offen, mit der Oberfläche |
 | N8 | offen, mit dem Datei-Import |
 | E4 | bleibt (D3) |
