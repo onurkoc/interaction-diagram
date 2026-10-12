@@ -2,14 +2,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
-import { loadReference, assertClose } from './helpers.js';
+import { loadReference, assertClose, waiting } from './helpers.js';
 
 const reference = loadReference();
 
 for (const c of reference.cases) {
     // c.known_wrong: the Python values are wrong (see NOTES.md),
     // the 1:1 port has to reproduce them anyway
-    test(`int_diagram: ${c.name}`, () => {
+    test(`int_diagram: ${c.name}`, waiting(c.name), () => {
         if (c.error) {
             // Python raised an exception, the port throws at the same place
             assert.throws(() => int_diagram(c.params),

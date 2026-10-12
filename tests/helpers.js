@@ -12,6 +12,30 @@ export function loadReference() {
 }
 
 /**
+ * Reference cases whose Python values are not valid any more after a
+ * correction (NOTES.md, section 5). They wait for reference values from
+ * a recognised program (D6), the app does not calculate its own
+ * reference. Value: the finding whose correction changed the result.
+ * @type {Object<string, string>}
+ */
+export const WAITING_FOR_REFERENCE = {
+    'alpha_cc_080_raised_to_085': 'E5',
+};
+
+/**
+ * Test options for a reference case: skipped while it waits for
+ * reference values.
+ * @param {string} name  name of the reference case
+ * @returns {{skip?: string}}
+ */
+export function waiting(name) {
+    if (name in WAITING_FOR_REFERENCE) {
+        return { skip: `wartet auf Referenz (${WAITING_FOR_REFERENCE[name]})` };
+    }
+    return {};
+}
+
+/**
  * Compare with the Python reference: |a - b| <= 1e-9 * |ref| + 1e-12
  * Numbers, booleans and nested arrays are supported.
  * @param {any} actual

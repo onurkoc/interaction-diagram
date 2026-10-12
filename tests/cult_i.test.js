@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
 import { cult_I } from '../app/cult_i.js';
-import { loadReference, assertClose } from './helpers.js';
+import { loadReference, assertClose, waiting } from './helpers.js';
 
 const reference = loadReference();
 
@@ -29,7 +29,7 @@ for (const c of reference.cases) {
         }
     });
 
-    test(`cult_I with curves from core.js: ${c.name}`, () => {
+    test(`cult_I with curves from core.js: ${c.name}`, waiting(c.name), () => {
         const result = int_diagram(c.params);
         assert.notEqual(result, null);
         const [input_values, values] = /** @type {any} */ (result);
