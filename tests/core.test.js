@@ -3,19 +3,19 @@
 Regression against the Python reference (legacy/core.py).
 The norm configuration with the legacy strain planes is used, because
 the default planes (pivot points A, B, C) differ from Python.
-Cases whose values changed with a correction are skipped, see helpers.js.
+The reference contains only sections for which core.py is correct
+(a_s1 = a_s2, d_1 = d_2); the corrections are tested in
+corrections.test.js and commercial program.test.js.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
-import { loadReference, assertClose, waiting, waiting_left_side,
-         EN_LEGACY_PLANES } from './helpers.js';
+import { loadReference, assertClose, EN_LEGACY_PLANES } from './helpers.js';
 
 const reference = loadReference();
 
 for (const c of reference.cases) {
-    test(`int_diagram, legacy strain planes: ${c.name}`, waiting(c.name),
-         () => {
+    test(`int_diagram, legacy strain planes: ${c.name}`, () => {
         if (c.error) {
             // Python raised an exception, the port throws at the same place
             assert.throws(() => int_diagram(c.params, EN_LEGACY_PLANES),
@@ -49,15 +49,14 @@ for (const c of reference.cases) {
     if (!c.result) {
         continue;
     }
-    test(`int_diagram, legacy strain planes, left side: ${c.name}`,
-         waiting_left_side(c.name), () => {
+    test(`int_diagram, legacy strain planes, left side: ${c.name}`, () => {
         const result = int_diagram(c.params, EN_LEGACY_PLANES);
         assert.notEqual(result, null);
         const values = /** @type {any} */ (result)[1];
         const ref = c.result.values;
 
         // Python mirrored the right side. That is correct for
-        // a_s1 = a_s2 and d_1 = d_2, the other cases are skipped (N2).
+        // a_s1 = a_s2 and d_1 = d_2.
         assertClose(values['Moment Neg'], ref['Moment Neg'], 'Moment Neg');
         assertClose(values['Normal Force Neg'], ref['Normal Force'],
                     'Normal Force Neg');

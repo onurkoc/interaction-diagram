@@ -29,29 +29,18 @@ import intersection as inter  # noqa: E402
 OUT_FILE = os.path.join(HERE, 'reference.json')
 
 # parameter sets for core.int_diagram
-# 'known_wrong' marks sets whose Python results are wrong (see NOTES.md)
+# Only sets for which core.py is correct: a_s1 = a_s2 > 0, d_1 = d_2 and
+# alpha_cc >= 0.85. The sets for the known problems of core.py (E5, E10,
+# N1, N2 in NOTES.md) were removed after the corrections; the corrected
+# behaviour is tested in tests/corrections.test.js.
 CASES = [
     {'name': 'default',
      'params': {}},
     {'name': 'default_eccentricity',
      'params': {'eccentricity': True}},
-    {'name': 'as1_zero',
-     'params': {'a_s1': 0, 'a_s2': 5}},
-    {'name': 'as1_zero_eccentricity',
-     'params': {'a_s1': 0, 'a_s2': 5, 'eccentricity': True}},
-    {'name': 'as2_zero',
-     'params': {'a_s1': 5, 'a_s2': 0}},
-    {'name': 'as2_zero_eccentricity',
-     'params': {'a_s1': 5, 'a_s2': 0, 'eccentricity': True}},
-    {'name': 'no_reinforcement',
-     'params': {'a_s1': 0, 'a_s2': 0}},
-    {'name': 'no_reinforcement_eccentricity',
-     'params': {'a_s1': 0, 'a_s2': 0, 'eccentricity': True}},
     {'name': 'thin_c25_b550_alpha085',
      'params': {'h_': 0.20, 'd_1': 0.04, 'd_2': 0.04, 'a_s1': 2.58,
                 'a_s2': 2.58, 'f_ck': 25, 'f_yk': 550, 'alpha_cc': 0.85}},
-    {'name': 'alpha_cc_080_raised_to_085',
-     'params': {'f_ck': 30, 'alpha_cc': 0.80}},
     {'name': 'thick_c30_accidental_eccentricity',
      'params': {'h_': 0.60, 'b_': 0.8, 'd_1': 0.05, 'd_2': 0.05,
                 'gamma_c': 1.2, 'gamma_s': 1.0, 'a_s1': 10.05,
@@ -64,18 +53,6 @@ CASES = [
      'params': {'h_': 0.30, 'b_': 1.0, 'd_1': 0.05, 'd_2': 0.05,
                 'a_s1': 5.24, 'a_s2': 5.24, 'f_ck': 30, 'f_yk': 500,
                 'eccentricity': True}},
-    {'name': 'as1_not_equal_as2',
-     'params': {'a_s1': 5, 'a_s2': 10},
-     'known_wrong': ['N1', 'N2'],
-     'note': 'bekannt falsch (N1/N2)'},
-    {'name': 'as1_not_equal_as2_eccentricity',
-     'params': {'a_s1': 10, 'a_s2': 5, 'eccentricity': True},
-     'known_wrong': ['N1', 'N2'],
-     'note': 'bekannt falsch (N1/N2)'},
-    {'name': 'd1_not_equal_d2',
-     'params': {'d_1': 0.03, 'd_2': 0.06},
-     'known_wrong': ['N2'],
-     'note': 'bekannt falsch (N2)'},
     {'name': 'invalid_d_returns_none',
      'params': {'h_': 0.03, 'd_1': 0.03}},
     {'name': 'gamma_c_zero_raises',
@@ -164,9 +141,6 @@ def sha256_lf(path):
 
 def run_case(case):
     entry = {'name': case['name'], 'params': case['params']}
-    if 'known_wrong' in case:
-        entry['known_wrong'] = case['known_wrong']
-        entry['note'] = case['note']
     try:
         result = core.int_diagram(**case['params'])
     except Exception as e:
