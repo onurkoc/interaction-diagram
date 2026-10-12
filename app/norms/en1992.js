@@ -90,10 +90,9 @@ export const en1992 = {
         return p.f_yk / p.gamma_s;
     },
 
-    // 6.1 (4): e0 = h/30 >= 20 mm
-    // core.py takes the smaller value (E1), kept until the correction
+    // 6.1 (4): e0 = h/30 >= 20 mm, h in m
     min_eccentricity(h) {
-        return Math.min(h / 30, 0.02);
+        return Math.max(h / 30, 0.02);
     },
 
     // 6.1 (5), 6.1 (6), Bild 6.1: pivot points A, B, C (D2).
