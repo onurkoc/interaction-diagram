@@ -1,6 +1,14 @@
 // @ts-check
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { en1992 } from '../app/norms/en1992.js';
+
+/**
+ * EN 1992-1-1 with the strain planes of legacy/core.py, for the
+ * regression against the Python reference.
+ * @type {import('../app/norms/en1992.js').Norm}
+ */
+export const EN_LEGACY_PLANES = { ...en1992, strain_planes: { type: 'legacy' } };
 
 /**
  * Reference values written by tests/reference/make_reference.py
@@ -26,6 +34,18 @@ export const WAITING_FOR_REFERENCE = {
     'as1_not_equal_as2': 'N1',
     'as1_not_equal_as2_eccentricity': 'N1',
     'no_reinforcement_eccentricity': 'E10',
+};
+
+/**
+ * Reference cases whose left side (negative moment) is not valid any
+ * more: Python mirrored the right side, which is wrong for
+ * a_s1 != a_s2 or d_1 != d_2 (N2).
+ * @type {Object<string, string>}
+ */
+export const WAITING_LEFT_SIDE = {
+    'as2_zero': 'N2',
+    'as2_zero_eccentricity': 'N2',
+    'd1_not_equal_d2': 'N2',
 };
 
 /**
@@ -65,4 +85,16 @@ export function assertClose(actual, ref, label) {
         return;
     }
     assert.equal(actual, ref, label);
+}
+
+/**
+ * Like waiting(), for tests that also use the left side of the diagram.
+ * @param {string} name  name of the reference case
+ * @returns {{skip?: string}}
+ */
+export function waiting_left_side(name) {
+    if (name in WAITING_LEFT_SIDE) {
+        return { skip: `wartet auf Referenz (${WAITING_LEFT_SIDE[name]})` };
+    }
+    return waiting(name);
 }

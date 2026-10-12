@@ -1,22 +1,28 @@
 // @ts-check
+/*
+Regression against the Python reference (legacy/core.py).
+The norm configuration with the legacy strain planes is used, because
+the default planes (pivot points A, B, C) differ from Python.
+Cases whose values changed with a correction are skipped, see helpers.js.
+*/
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
-import { loadReference, assertClose, waiting } from './helpers.js';
+import { loadReference, assertClose, waiting, waiting_left_side,
+         EN_LEGACY_PLANES } from './helpers.js';
 
 const reference = loadReference();
 
 for (const c of reference.cases) {
-    // c.known_wrong: the Python values are wrong (see NOTES.md),
-    // the 1:1 port has to reproduce them anyway
-    test(`int_diagram: ${c.name}`, waiting(c.name), () => {
+    test(`int_diagram, legacy strain planes: ${c.name}`, waiting(c.name),
+         () => {
         if (c.error) {
             // Python raised an exception, the port throws at the same place
-            assert.throws(() => int_diagram(c.params),
+            assert.throws(() => int_diagram(c.params, EN_LEGACY_PLANES),
                           { message: c.error.message });
             return;
         }
-        const result = int_diagram(c.params);
+        const result = int_diagram(c.params, EN_LEGACY_PLANES);
         if (c.result === null) {
             assert.equal(result, null);
             return;
@@ -31,10 +37,33 @@ for (const c of reference.cases) {
                         `input_values.${key}`);
         }
 
+        // right side of the diagram.
         // x1_y1 and x2_y2 of the reference (old capping of the curve with
         // the minimum eccentricity) do not exist any more (E2, D1)
-        for (const key of Object.keys(values)) {
+        for (const key of ['Moment', 'Normal Force',
+                           'Moment Reinf', 'Normal Force Reinf']) {
             assertClose(values[key], c.result.values[key], `values.${key}`);
         }
+    });
+
+    if (!c.result) {
+        continue;
+    }
+    test(`int_diagram, legacy strain planes, left side: ${c.name}`,
+         waiting_left_side(c.name), () => {
+        const result = int_diagram(c.params, EN_LEGACY_PLANES);
+        assert.notEqual(result, null);
+        const values = /** @type {any} */ (result)[1];
+        const ref = c.result.values;
+
+        // Python mirrored the right side. That is correct for
+        // a_s1 = a_s2 and d_1 = d_2, the other cases are skipped (N2).
+        assertClose(values['Moment Neg'], ref['Moment Neg'], 'Moment Neg');
+        assertClose(values['Normal Force Neg'], ref['Normal Force'],
+                    'Normal Force Neg');
+        assertClose(values['Moment Reinf Neg'], ref['Moment Reinf Neg'],
+                    'Moment Reinf Neg');
+        assertClose(values['Normal Force Reinf Neg'],
+                    ref['Normal Force Reinf'], 'Normal Force Reinf Neg');
     });
 }
