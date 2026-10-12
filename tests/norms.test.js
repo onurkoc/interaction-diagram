@@ -92,13 +92,11 @@ test('minimum eccentricity: EN has a rule, SIA has none', () => {
     assert.equal(sia262.min_eccentricity, null);
     assert.notEqual(en1992.min_eccentricity, null);
 
-    // SIA mode ignores the eccentricity option
-    const result = int_diagram({ f_ck: 30, eta_t: 0.85, eccentricity: true },
-                               sia262);
-    assert.notEqual(result, null);
-    const [input_values, values] = /** @type {any} */ (result);
-    assert.equal(input_values.eccentricity, false);
-    assert.equal('x1_y1' in values, false);
+    // SIA mode rejects the eccentricity option, no silent correction
+    assert.throws(
+        () => int_diagram({ f_ck: 30, eta_t: 0.85, eccentricity: true },
+                          sia262),
+        /Mindestausmitte/);
 });
 
 test('SIA and EN give the same curves for the same f_cd', () => {

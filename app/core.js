@@ -280,8 +280,11 @@ export function int_diagram({
     let n_max = 0;
     let m_min = 0;
     if (norm.min_eccentricity === null) {
-        // the norm has no minimum eccentricity
-        eccentricity = false;
+        if (eccentricity) {
+            // no silent correction of the input
+            throw new Error(`${norm.name}: keine Mindestausmitte, ` +
+                            'die Option ist in diesem Modus nicht zulässig.');
+        }
     } else {
         const min_ecc = norm.min_eccentricity(h_);
         // min eccentricity as defined in EN1992-1 6.1(4)
