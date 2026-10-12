@@ -50,6 +50,17 @@ function round3(x) {
 }
 
 /**
+ * Distance of the normal force n to the nearer end of the curve:
+ * to centric compression (smallest N) or to pure tension (largest N).
+ * @param {number} n
+ * @param {number[]} limit_y  normal forces of the curve
+ * @returns {number}
+ */
+function distance_to_ends(n, limit_y) {
+    return Math.min(n - min(limit_y), max(limit_y) - n);
+}
+
+/**
  * capacity utilization of linings in tunnels (CULT-I)
  * according to the paper:
  * Performance indicator of tunnel linings under geotechnical uncertainty;
@@ -106,8 +117,7 @@ export function cult_I(m, n, input_values, values) {
         } else {
             n_rel_i = Math.abs(y2[0] - n);
             if (n_rel_i > n_rel_max) {
-                n_rel_i = Math.min(Math.abs(min(limit_y)) - Math.abs(n),
-                                   max(limit_y) - Math.abs(n));
+                n_rel_i = distance_to_ends(n, limit_y);
             }
         }
         if (m_rel_i < 0) {
@@ -115,8 +125,7 @@ export function cult_I(m, n, input_values, values) {
         }
     } else if (m === 0) {
         m_rel_i = m_rel_max;
-        n_rel_i = Math.min(Math.abs(min(limit_y)) - Math.abs(n),
-                           max(limit_y) - Math.abs(n));
+        n_rel_i = distance_to_ends(n, limit_y);
         if (n > max(limit_y) || n < min(limit_y)) {
             // beyond pure tension or beyond centric compression
             return 'outside';
@@ -141,8 +150,7 @@ export function cult_I(m, n, input_values, values) {
         } else {
             n_rel_i = Math.abs(y2[0] - n);
             if (n_rel_i > n_rel_max) {
-                n_rel_i = Math.min(Math.abs(min(limit_y)) - Math.abs(n),
-                                   max(limit_y) - Math.abs(n));
+                n_rel_i = distance_to_ends(n, limit_y_neg);
             }
         }
         if (m_rel_i > 0) {

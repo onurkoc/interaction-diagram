@@ -44,7 +44,10 @@ CASES = [
     {'name': 'thick_c30_accidental_eccentricity',
      'params': {'h_': 0.60, 'b_': 0.8, 'd_1': 0.05, 'd_2': 0.05,
                 'gamma_c': 1.2, 'gamma_s': 1.0, 'a_s1': 10.05,
-                'a_s2': 10.05, 'f_ck': 30, 'eccentricity': True}},
+                'a_s2': 10.05, 'f_ck': 30, 'eccentricity': True},
+     # cult_i.py uses the wrong distance to the tension side for these
+     # points (N9 in NOTES.md), their old results are not kept
+     'cult_I_skip': [(0.05, -1.0), (-0.05, -1.0), (0.02, -5.5)]},
     # typical shotcrete lining, section for the comparison with commercial program
     {'name': 'shotcrete_h30_c30_b500',
      'params': {'h_': 0.30, 'b_': 1.0, 'd_1': 0.05, 'd_2': 0.05,
@@ -59,13 +62,14 @@ CASES = [
      'params': {'gamma_c': 0}},
 ]
 
-# load points (m [MNm], n [MN]) for cult_i.cult_I, used with every case
+# load points (m [MNm], n [MN]) for cult_i.cult_I, used with every case.
+# Points with m = 0 and compression are not included: cult_i.py uses the
+# wrong distance to the tension side there (N9 in NOTES.md).
 CULT_I_POINTS = [
     (0.05, -1.0),
     (-0.05, -1.0),
     (0.10, -3.0),
     (-0.21, -1.0),
-    (0.0, -2.0),
     (0.0, 0.0),
     (0.01, 0.1),
     (-0.01, 0.1),
@@ -153,6 +157,8 @@ def run_case(case):
 
     cult = []
     for m, n in CULT_I_POINTS:
+        if (m, n) in case.get('cult_I_skip', []):
+            continue
         point = {'m': m, 'n': n}
         try:
             point['cult_I'] = cult_i.cult_I(m=m, n=n,
