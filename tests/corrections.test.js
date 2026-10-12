@@ -89,3 +89,18 @@ test('E10/D7: alpha_cc_pl is editable (EN)', () => {
         (/** @type {number} */ n) => 0.6 / 0.8 * n);
     assertClose(values_06['Normal Force'], expected, 'Normal Force');
 });
+
+test('N1: the compression reinforcement is a_s2', () => {
+    // First strain plane of the legacy arrays: almost uniform -3.5 per
+    // mille, a_s2 yields in compression. Its force is a_s2 * f_yd.
+    const f_yd = 500 / 1.15;
+    for (const a_s1 of [0, 5, 10]) {
+        // a_s2 = 2 and not 0, so the section is never plain concrete (D7)
+        const small = curves({ a_s1: a_s1, a_s2: 2 });
+        const large = curves({ a_s1: a_s1, a_s2: 8 });
+        const difference = large['Normal Force Reinf'][0] -
+                           small['Normal Force Reinf'][0];
+        // a_s in cm2, forces in MN
+        assertClose(difference, -6 * f_yd / 10000, `a_s1 = ${a_s1}`);
+    }
+});
