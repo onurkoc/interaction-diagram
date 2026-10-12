@@ -37,15 +37,82 @@ SIA 262:2025, SIA 197:2023). D1–D7 sind Entscheide von Onur Koc.
   16,5), ab C30/37 auf 0,1 N/mm². Massgebend ist die Formel (Gl. (2)).
   Der Test vergleicht mit ±0,25 bzw. ±0,05 N/mm².
 
-## 4 Stand der Umsetzung
+## 4 Befunde im ursprünglichen Python-Code
 
-Die Norm-Konfigurationen (`app/norms/`) und der Generator für die
-Dehnungsebenen (`app/strain_planes.js`) sind vorhanden und getestet.
-Das Rechenverhalten ist aber noch das von `legacy/core.py`:
+Die Befunde beziehen sich auf `legacy/` (Stand 2020). Sie sind Hinweise
+aus der Durchsicht, keine nachgerechneten Ergebnisse. Der Port nach
+JavaScript hat sie zuerst 1:1 übernommen; die Korrekturen stehen in
+Abschnitt 5.
 
-- Dehnungsebenen: legacy-Array (Generator noch nicht Vorgabe).
-- Mindestausmitte EN, α_cc < 0,85, unbewehrter Querschnitt, f_ck-Grenze:
-  noch wie in `legacy/core.py` bzw. noch nicht angewendet.
+### 4.1 core.py gegen EN 1992-1-1 (empfohlene Werte, ohne NA)
 
-Die Korrekturen folgen einzeln, je als eigener Commit. Die Liste der
-Befunde (E1–E10, C1–C4, N1–N8) wird in Phase 3c hier ergänzt.
+| Nr | Code-Stelle | Ziffer EN | Befund | Bewertung |
+|---|---|---|---|---|
+| E1 | core.py: `min_ecc = min(h_ / 30, 0.02)` | 6.1 (4) | Norm: Mindestausmitte e0 = h/30 ≥ 20 mm, also der **grössere** Wert. Code nimmt den kleineren. README schreibt es richtig. | Fehler. Korrektur: `max(h_/30, 0.02)`. |
+| E2 | core.py: `n_max = f_ck * b_ * d`, `m_min = min_ecc * n_max`; draw_diagram.py: senkrechte Linie bei M = ±m_min von N = 0 bis −n_max, Schnitt mit der Widerstandskurve | 6.1 (4) | Die Mindestausmitte bezieht sich auf die einwirkende Normalkraft (M ≥ e0·N). Der Code bildet stattdessen ein konstantes Moment aus e0 und einer Hilfsnormalkraft mit f_ck (charakteristisch, nicht f_cd), d statt h und ohne Bewehrung. Die daraus abgeleitete Kappung des Diagramms entspricht damit nicht der Regel. | Braucht Attention. Entscheid D1. |
+| E3 | core.py: Dehnungszustände Zeilen 1–13 (`eps_c = −0.0035`, `eps_s1` von −0.003499 bis 0) | 6.1 (5), 6.1 (6), Bild 6.1 | Norm: Dehnungsebenen drehen im Druckbereich um Punkt C bei (1 − εc2/εcu2)·h; bei zentrischem Druck ist die Stauchung auf εc2 = 2 ‰ zu begrenzen. Der Code dreht weiter um B bis fast gleichmässig 3,5 ‰. Folge: Die Druckbewehrung erreicht im fast zentrischen Bereich höhere Dehnungen als nach Norm (bei B500 liegt ε_yd über 2 ‰), der Widerstand nahe reinem Druck wird voraussichtlich überschätzt (unsichere Seite). | Braucht Attention. Entscheid D2. |
+| E4 | core.py: Stahldehnung fest begrenzt auf 0,012 (Zeilen 41–52) | 3.2.7 (2) b, 6.1 (3) | Bei horizontalem oberem Ast muss die Stahldehnung nicht begrenzt werden; ε_ud gilt nur «wo anwendbar» (ansteigender Ast, empfohlen 0,9·ε_uk). 0,012 ist kein Normwert. Die zugehörigen Ebenen mit εc < εcu2 liefern voraussichtlich kleinere Widerstände, also eher auf der sicheren Seite. | Zulässig, aber nicht normbegründet. Entscheid D3. |
+| E5 | core.py: `if alpha_cc < 0.85: alpha_cc = 0.85` | 3.1.6 (1) mit Anm. | Norm: α_cc zwischen 0,8 und 1,0 (NDP), empfohlen 1,0. Der Code hebt Werte < 0,85 still auf 0,85 an und hat keine Obergrenze. Ein zulässiges α_cc = 0,8 wird damit ohne Hinweis zu 0,85. | Fehler (unsichere Seite). Eingabe nur 0,8–1,0 zulassen, ausserhalb mit Meldung ablehnen statt still korrigieren. |
+| E6 | core.py: Parabel mit festen Konstanten (εc2 = 2 ‰, εcu2 = 3,5 ‰, n = 2) | 3.1.7 (1), Tabelle 3.1 | Die festen Werte gelten nach Tabelle 3.1 nur bis f_ck = 50 MPa. Darüber ändern sich εc2, εcu2 und n. Der Code prüft f_ck nicht. | Entscheid D4. |
+| E7 | core.py: Vorgaben γ_c = 1,50, γ_s = 1,15 | 2.4.2.4, Tabelle 2.1N | Entspricht «ständig & vorübergehend». «Aussergewöhnlich»: 1,2 / 1,0. | In Ordnung. Optional als Auswahl anbieten. |
+| E8 | core.py: `e_steel = 200000`, `f_yd = f_yk / gamma_s` | 3.2.7 (4), 3.2.7 (2) b | Entspricht der Norm. | In Ordnung. |
+| E9 | core.py: Annahmen ebene Querschnitte, keine Betonzugfestigkeit, Verbund | 6.1 (2)P | Entspricht der Norm. | In Ordnung. |
+| E10 | core.py: Kurve des unbewehrten Querschnitts mit demselben f_cd wie die bewehrte | EN 12.3.1 (1), 12.6.1 (2); SIA 262 0.1.8, 5.5.1.2; SIA 197 7.6.2.2 | Für unbewehrten Beton gelten in beiden Normen abgeminderte Festigkeiten. Die App verwendet die unbewehrte Kurve für CULT-I, wenn keine Bewehrung eingegeben ist. EN 12.6.2 verlangt zudem eine Begrenzung der Lastausmitte (wird nicht geprüft). | Entscheid D7. |
+
+Hinweis zu k_σ: Die Form von SIA 262 Gl. (27) gibt es in EN 1992-1-1 als
+Gl. (3.14) in 3.1.5, dort aber für nichtlineare Schnittgrössenermittlung
+und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
+(Parabel-Rechteck mit n).
+
+### 4.2 Weitere Befunde (nicht normbezogen)
+
+| Nr | Stelle | Befund |
+|---|---|---|
+| C1 | cult_i.py | CULT-I wird immer gegen die ungekappte Widerstandskurve gerechnet, auch wenn die Mindestausmitte aktiv ist. |
+| C2 | cult_i.py: `if cult_I is not str:` | Bedingung ist immer wahr (Vergleich mit dem Typ `str`). Gemeint war vermutlich `isinstance`. |
+| C3 | cult_i.py, Zweig `m == 0`: `if max(limit_y) < n < min(limit_y)` | Kann nie wahr sein (max < min); ein Punkt ausserhalb wird bei m = 0 nie als «outside» erkannt. |
+| C4 | core.py: Dehnungsarray | Von Hand eingetippt und unregelmässig (0,0046 fehlt, 0,012 mehrfach). |
+| N1 | core.py: `alpha = a_s1 / a_s2`, Druckbewehrung = `alpha * a_s1` | Druckbewehrung = a_s1²/a_s2 statt a_s2. Ergebnisse nur bei a_s1 = a_s2 richtig. Bei a_s1 = 0 wird a_s2 ganz ignoriert. **Braucht Attention für alle früheren Auswertungen mit ungleicher Bewehrung.** |
+| N2 | core.py: `moment_neg`, `moment_reinf_neg` | Negative Momentenseite ist die Spiegelung `-abs(M)` der positiven. Bei a_s1 ≠ a_s2 oder d_1 ≠ d_2 falsch. |
+| N3 | cult_i.py: Wahl von `limit_x_neg` | Bei a_s1 ≠ 0 und a_s2 = 0 wird die Betonkurve (`Moment Neg`) mit den Normalkräften der bewehrten Kurve gepaart. |
+| N4 | cult_i.py: `if m_rel_i < 0` bzw. `> 0` | Vergleich auf einem Array: Bei zwei Schnittpunkten auf der Horizontalen wirft Python einen ValueError, den App.py nicht abfängt. |
+| N5 | core.py: Parameterprüfung | Steht in der Schleife, nach der Division durch `gamma_c`. `gamma_c = 0` gibt einen Absturz statt `None`. |
+| N6 | draw_diagram.py: Legende | Zeigt f_cd = f_ck/γ_c ohne α_cc. |
+| N7 | draw_diagram.py: Ausmitte-Linie | `min()` auf leerem Schnittpunkt-Array stürzt ab, wenn die Linie die Kurve nicht trifft. |
+| N8 | xls_read.py: Spaltensuche | Über `'n' in name` und `'m' in name`: Ein Kopf «Moment» trifft beide. Funktioniert nur mit den Köpfen `n` und `m`. |
+
+## 5 Entscheide und Stand der Korrekturen
+
+| Nr | Entscheid |
+|---|---|
+| D1 | Mindestausmitte EN 6.1 (4) auf die Lastpunkte anwenden, nicht auf die Widerstandskurve: M_Ed,mod = sign(M_Ed) · max(\|M_Ed\|, e0 · \|N_Ed\|), e0 = max(h/30; 20 mm), nur bei Druck; bei M_Ed = 0 beide Vorzeichen prüfen. CULT-I mit den modifizierten Lastpunkten. Die alte Kappung der Kurve entfällt. Nur im EN-Modus. |
+| D2 | Dehnungsebenen nach Bild 6.1 (Drehpunkte A, B, C), C bei (1 − εc2/εcu2)·h. |
+| D3 | Stahldehnungsgrenze 12 ‰ bleibt, horizontaler Ast. |
+| D4 | f_ck ≤ 50 MPa in beiden Modi; Eingabe darüber mit Meldung ablehnen. |
+| D5 | Drehpunkt C auch im SIA-Modus, als konservative Annahme analog EN. |
+| D6 | Vergleich eines Querschnitts mit Fagus nach der Umsetzung. Bis dahin sind Tests, deren Werte sich durch Korrekturen ändern, als «wartet auf Referenz» markiert. |
+| D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
+
+Reihenfolge der Korrekturen, je ein eigener Commit:
+
+| Befund | Stand |
+|---|---|
+| E5 | offen |
+| E1 | offen |
+| E6 (D4) | offen |
+| E10 (D7) | offen |
+| N1 | offen |
+| E2 (D1), damit C1 und N7 | offen |
+| E3 (D2, D5) + N2, damit C4 | offen |
+| C2 | offen |
+| C3 | offen |
+| N3 | offen |
+| N4 | offen |
+| N5, N6 | offen, mit der Oberfläche |
+| N8 | offen, mit dem Datei-Import |
+| E4 | bleibt (D3) |
+
+Nach jeder Korrektur sind die betroffenen Python-Referenzwerte ungültig.
+Die Tests dazu sind als «wartet auf Referenz» übersprungen
+(`tests/helpers.js`); neue Referenzwerte kommen aus einem anerkannten
+Programm, nicht aus dieser App.
