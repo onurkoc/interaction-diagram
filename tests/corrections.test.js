@@ -237,3 +237,21 @@ test('C3: a point with m = 0 beyond the curve is outside', () => {
     assert.equal(typeof cult_I(0, n_compression / 2, input_values, values),
                  'number');
 });
+
+test('N3: CULT-I uses the curves with reinforcement on both sides', () => {
+    // One layer only: the old code took the concrete curve for one
+    // side and paired it with the normal forces of the other curve.
+    for (const params of [{ a_s1: 5, a_s2: 0 }, { a_s1: 0, a_s2: 5 }]) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        // the result must not depend on the plain concrete curves
+        const without_concrete = { ...values, 'Moment': [], 'Moment Neg': [],
+                                   'Normal Force': [], 'Normal Force Neg': [] };
+        for (const [m, n] of [[0.05, -1], [-0.05, -1], [0.1, -3], [-0.1, -3]]) {
+            assert.equal(cult_I(m, n, input_values, without_concrete),
+                         cult_I(m, n, input_values, values),
+                         `m = ${m}, n = ${n}`);
+        }
+    }
+});
