@@ -113,7 +113,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | N9 | umgesetzt: Abstand zu den Enden der Kurve = min(n − N_min; N_max − n) |
 | N10 | offen: CULT-I-Definition (N_rel,max, Richtung von N_rel,i) nicht am Original geprüft; Code unverändert |
 | N5, N6 | offen, mit der Oberfläche |
-| N8 | offen, mit dem Datei-Import |
+| N8 | umgesetzt für Excel: Spaltenköpfe «n» und «m» werden exakt erkannt (optional mit Einheit in eckigen Klammern); Plaxis folgt |
 | E4 | bleibt (D3) |
 
 ## 6 Tests und Referenzen
