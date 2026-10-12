@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { int_diagram, concrete_force } from '../app/core.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { generate_strain_planes } from '../app/strain_planes.js';
-import { loadReference, waiting } from './helpers.js';
+import { loadReference } from './helpers.js';
 
 const reference = loadReference();
 
@@ -98,7 +98,7 @@ for (const c of reference.cases) {
         continue;
     }
     test(`generated planes (no pivot C, no tension end) vs legacy: ${c.name}`,
-         waiting(c.name), () => {
+         () => {
         const norm = { ...en1992, strain_planes: LIKE_LEGACY };
         const result = int_diagram(c.params, norm);
         assert.notEqual(result, null);

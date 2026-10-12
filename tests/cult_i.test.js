@@ -3,8 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
 import { cult_I } from '../app/cult_i.js';
-import { loadReference, assertClose, waiting_left_side,
-         EN_LEGACY_PLANES } from './helpers.js';
+import { loadReference, assertClose, EN_LEGACY_PLANES } from './helpers.js';
 
 const reference = loadReference();
 
@@ -13,7 +12,6 @@ for (const c of reference.cases) {
         // int_diagram returned None or raised, no CULT-I values
         continue;
     }
-    // c.known_wrong: the Python curves are wrong (see NOTES.md).
     // Here only cult_i.js is tested: with the curves of the Python
     // reference it has to give the Python results.
     test(`cult_I: ${c.name}`, () => {
@@ -38,8 +36,7 @@ for (const c of reference.cases) {
     });
 
     // the whole chain with the legacy strain planes
-    test(`cult_I with curves from core.js: ${c.name}`,
-         waiting_left_side(c.name), () => {
+    test(`cult_I with curves from core.js: ${c.name}`, () => {
         const result = int_diagram(c.params, EN_LEGACY_PLANES);
         assert.notEqual(result, null);
         const [input_values, values] = /** @type {any} */ (result);

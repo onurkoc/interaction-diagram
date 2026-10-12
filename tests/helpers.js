@@ -20,48 +20,6 @@ export function loadReference() {
 }
 
 /**
- * Reference cases whose Python values are not valid any more after a
- * correction (NOTES.md, section 5). They wait for reference values from
- * a recognised program (D6), the app does not calculate its own
- * reference. Value: the finding whose correction changed the result.
- * @type {Object<string, string>}
- */
-export const WAITING_FOR_REFERENCE = {
-    'alpha_cc_080_raised_to_085': 'E5',
-    'no_reinforcement': 'E10',
-    'as1_zero': 'N1',
-    'as1_zero_eccentricity': 'N1',
-    'as1_not_equal_as2': 'N1',
-    'as1_not_equal_as2_eccentricity': 'N1',
-    'no_reinforcement_eccentricity': 'E10',
-};
-
-/**
- * Reference cases whose left side (negative moment) is not valid any
- * more: Python mirrored the right side, which is wrong for
- * a_s1 != a_s2 or d_1 != d_2 (N2).
- * @type {Object<string, string>}
- */
-export const WAITING_LEFT_SIDE = {
-    'as2_zero': 'N2',
-    'as2_zero_eccentricity': 'N2',
-    'd1_not_equal_d2': 'N2',
-};
-
-/**
- * Test options for a reference case: skipped while it waits for
- * reference values.
- * @param {string} name  name of the reference case
- * @returns {{skip?: string}}
- */
-export function waiting(name) {
-    if (name in WAITING_FOR_REFERENCE) {
-        return { skip: `wartet auf Referenz (${WAITING_FOR_REFERENCE[name]})` };
-    }
-    return {};
-}
-
-/**
  * Compare with the Python reference: |a - b| <= 1e-9 * |ref| + 1e-12
  * Numbers, booleans and nested arrays are supported.
  * @param {any} actual
@@ -85,16 +43,4 @@ export function assertClose(actual, ref, label) {
         return;
     }
     assert.equal(actual, ref, label);
-}
-
-/**
- * Like waiting(), for tests that also use the left side of the diagram.
- * @param {string} name  name of the reference case
- * @returns {{skip?: string}}
- */
-export function waiting_left_side(name) {
-    if (name in WAITING_LEFT_SIDE) {
-        return { skip: `wartet auf Referenz (${WAITING_LEFT_SIDE[name]})` };
-    }
-    return waiting(name);
 }

@@ -90,7 +90,7 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 | D3 | Stahldehnungsgrenze 12 ‰ bleibt, horizontaler Ast. |
 | D4 | f_ck ≤ 50 MPa in beiden Modi; Eingabe darüber mit Meldung ablehnen. |
 | D5 | Drehpunkt C auch im SIA-Modus, als konservative Annahme analog EN. |
-| D6 | Vergleich eines Querschnitts mit Fagus nach der Umsetzung. Bis dahin sind Tests, deren Werte sich durch Korrekturen ändern, als «wartet auf Referenz» markiert. |
+| D6 | Vergleich eines Querschnitts mit Fagus nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
 | D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
 
 Reihenfolge der Korrekturen, je ein eigener Commit:
@@ -103,7 +103,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E10 (D7) | umgesetzt im Rechenkern; Hinweis und Legende folgen mit der Oberfläche |
 | N1 | umgesetzt: Druckbewehrung = a_s2 |
 | E2 (D1), damit C1 und N7 | umgesetzt im Rechenkern (`min_eccentricity_moments`, `cult_I_min_eccentricity`); Strahl M = ±e0·N und Tabelle folgen mit der Oberfläche |
-| E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. Fagus-Vergleich (D6) ausstehend. |
+| E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. Fagus-Vergleich (D6) bestanden, siehe Abschnitt 6. |
 | C2 | offen |
 | C3 | offen |
 | N3 | offen |
@@ -112,7 +112,27 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | N8 | offen, mit dem Datei-Import |
 | E4 | bleibt (D3) |
 
-Nach jeder Korrektur sind die betroffenen Python-Referenzwerte ungültig.
-Die Tests dazu sind als «wartet auf Referenz» übersprungen
-(`tests/helpers.js`); neue Referenzwerte kommen aus einem anerkannten
-Programm, nicht aus dieser App.
+## 6 Tests und Referenzen
+
+- **Python-Referenz** (`tests/reference/`): Werte aus dem unveränderten
+  `legacy/core.py` für Querschnitte, bei denen der alte Code richtig
+  rechnet (a_s1 = a_s2 > 0, d_1 = d_2, α_cc ≥ 0,85). Der Vergleich läuft
+  mit dem alten Dehnungsarray als Option. Die Parametersätze zu den
+  bekannten Fehlern (E5, E10, N1, N2) sind nach den Korrekturen entfernt.
+- **Regel-Tests** (`tests/corrections.test.js`): je Korrektur ein Test, der
+  nur prüft, was direkt aus der Regel folgt. Keine von der App
+  gerechneten Erwartungswerte.
+- **Fagus-Referenz** (`tests/fagus.test.js`), Vergleich durch Onur Koc am
+  2026-10-12, bestanden:
+  - Querschnitt: h = 0,30 m, b = 1,0 m, C30/37, B500,
+    a_s1 = a_s2 = 5,24 cm², d_1 = d_2 = 0,05 m; SIA 262, η_t = 1,0.
+  - Fagus-Einstellungen: Beton Typ 2 (Parabel-Rechteck), γ_c = 1,5,
+    γ_cE = 1,0, keine Abminderung, Kriechzahl 0, f_ct = 0;
+    Grenzdehnungen ε_cu,c = −2,0 ‰, ε_cu,t = −3,5 ‰, ε_s1 = 12 ‰;
+    Stahl ideal plastisch, γ_s = 1,15.
+  - Geprüfte Punkte (N [kN] / M [kNm]): −6419,2 / 0; 455,7 / 0;
+    −2496,8 / 259,9; 0 / 59,1. Ausnutzung in Fagus je 1,00.
+  - Toleranz im Test: 1 % (Fagus gibt zwei Nachkommastellen aus).
+
+Neue Referenzwerte kommen aus einem anerkannten Programm, nicht aus
+dieser App.
