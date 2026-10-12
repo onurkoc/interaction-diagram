@@ -268,6 +268,11 @@ export function int_diagram({
     }
     const norm_params = { f_ck, f_yk, gamma_c, gamma_s,
                           alpha_cc, alpha_cc_pl, eta_t };
+    // input outside the limits of the norm is rejected, not corrected
+    const messages = norm.check(norm_params);
+    if (messages.length > 0) {
+        throw new Error(`${norm.name}: ${messages.join(' ')}`);
+    }
     const f_cd = norm.f_cd(norm_params);
     const f_yd = norm.f_yd(norm_params);
     const d = h_ - d_1;

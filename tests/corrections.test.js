@@ -8,6 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
 import { en1992 } from '../app/norms/en1992.js';
+import { sia262 } from '../app/norms/sia262.js';
 import { assertClose } from './helpers.js';
 
 /**
@@ -37,4 +38,23 @@ test('E1: minimum eccentricity is the larger of h/30 and 20 mm', () => {
     assert.equal(e0(0.60), 0.02);
     // h/30 governs above h = 0.60 m
     assert.equal(e0(0.90), 0.90 / 30);
+});
+
+test('E6: f_ck above 50 is rejected in both norms (D4)', () => {
+    assert.notEqual(int_diagram({ f_ck: 50 }), null);
+    assert.throws(() => int_diagram({ f_ck: 55 }), /f_ck/);
+    assert.notEqual(int_diagram({ f_ck: 50, eta_t: 0.85 }, sia262), null);
+    assert.throws(() => int_diagram({ f_ck: 55, eta_t: 0.85 }, sia262),
+                  /f_ck/);
+});
+
+test('E5/E6: alpha_cc outside 0.8 to 1.0 is rejected, not corrected', () => {
+    assert.throws(() => int_diagram({ alpha_cc: 0.7 }), /alpha_cc/);
+    assert.throws(() => int_diagram({ alpha_cc: 1.1 }), /alpha_cc/);
+});
+
+test('E6: eta_t other than 1.0 / 0.85 / 1.2 is rejected (SIA)', () => {
+    assert.throws(() => int_diagram({ f_ck: 30, eta_t: 0.9 }, sia262),
+                  /eta_t/);
+    assert.throws(() => int_diagram({ f_ck: 30 }, sia262), /eta_t/);
 });
