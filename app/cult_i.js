@@ -80,6 +80,13 @@ export function cult_I(m, n, input_values, values) {
     } else {
         limit_x_neg = values['Moment Reinf Neg'];
     }
+    // normal forces of the left side, chosen like limit_y above
+    let limit_y_neg;
+    if (input_values['a_s1'] === 0) {
+        limit_y_neg = values['Normal Force Neg'];
+    } else {
+        limit_y_neg = values['Normal Force Reinf Neg'];
+    }
 
     const horizontal_cut_x = [min(limit_x_neg),
                               max(limit_x_pos)];
@@ -131,11 +138,11 @@ export function cult_I(m, n, input_values, values) {
         const [x1] = intersection(horizontal_cut_x,
                                   horizontal_cut_y,
                                   limit_x_neg,
-                                  limit_y);
+                                  limit_y_neg);
         const [, y2] = intersection(vertical_cut_x,
                                     vertical_cut_y,
                                     limit_x_neg,
-                                    limit_y);
+                                    limit_y_neg);
         if (x1.length === 0 || y2.length === 0) {
             return 'outside';
         }

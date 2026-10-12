@@ -92,9 +92,9 @@ test('E10/D7: alpha_cc_pl is editable (EN)', () => {
 });
 
 test('N1: the compression reinforcement is a_s2', () => {
-    // First strain plane of the legacy arrays: almost uniform -3.5 per
-    // mille, a_s2 yields in compression. Its force is a_s2 * f_yd.
-    const f_yd = 500 / 1.15;
+    // First strain plane: uniform compression -eps_c1, the stress of
+    // a_s2 is E_s * eps_c1 (below f_yd for B500).
+    const sigma_s = Math.min(en1992.e_steel * en1992.eps_c1, 500 / 1.15);
     for (const a_s1 of [0, 5, 10]) {
         // a_s2 = 2 and not 0, so the section is never plain concrete (D7)
         const small = curves({ a_s1: a_s1, a_s2: 2 });
@@ -102,7 +102,7 @@ test('N1: the compression reinforcement is a_s2', () => {
         const difference = large['Normal Force Reinf'][0] -
                            small['Normal Force Reinf'][0];
         // a_s in cm2, forces in MN
-        assertClose(difference, -6 * f_yd / 10000, `a_s1 = ${a_s1}`);
+        assertClose(difference, -6 * sigma_s / 10000, `a_s1 = ${a_s1}`);
     }
 });
 
@@ -155,4 +155,68 @@ test('E2/D1, C1: CULT-I uses the modified load point', () => {
     // modified point outside the curve
     const outside = cult_I_min_eccentricity(0, -6.4, e0, input_values, values);
     assert.equal(outside.cult_I, 'outside');
+});
+
+test('E3: the curve starts at uniform compression -eps_c1 (pivot C)', () => {
+    const params = { h_: 0.30, b_: 1.0, d_1: 0.05, d_2: 0.05,
+                     a_s1: 5.24, a_s2: 5.24, f_ck: 30, f_yk: 500 };
+    const f_cd = 30 / 1.5;
+    const f_yd = 500 / 1.15;
+    // steel stress at -eps_c1, limited by f_yd
+    const sigma_s = Math.min(en1992.e_steel * en1992.eps_c1, f_yd);
+    const n_concrete = -f_cd * 1.0 * 0.30;
+
+    const values = curves(params);
+    assertClose(values['Normal Force'][0], n_concrete, 'concrete');
+    assertClose(values['Normal Force Reinf'][0],
+                n_concrete - 2 * 5.24 * sigma_s / 10000, 'reinforced');
+    assert.ok(Math.abs(values['Moment Reinf'][0]) < 1e-12);
+
+    // and ends at uniform tension, both layers yield
+    const last = values['Normal Force Reinf'].length - 1;
+    assertClose(values['Normal Force Reinf'][last],
+                2 * 5.24 * f_yd / 10000, 'tension');
+    assert.ok(Math.abs(values['Normal Force'][last]) < 1e-12);
+    assert.ok(Math.abs(values['Moment Reinf'][last]) < 1e-12);
+});
+
+test('N2: symmetric section, the left side mirrors the right side', () => {
+    const values = curves({ a_s1: 5, a_s2: 5, d_1: 0.04, d_2: 0.04 });
+    for (const reinf of ['', ' Reinf']) {
+        const mirrored = values['Moment' + reinf].map(
+            (/** @type {number} */ m) => -m);
+        assertClose(values['Moment' + reinf + ' Neg'], mirrored, 'Moment');
+        assertClose(values['Normal Force' + reinf + ' Neg'],
+                    values['Normal Force' + reinf], 'Normal Force');
+    }
+});
+
+test('N2: swapping the two layers swaps the sides of the diagram', () => {
+    const values = curves({ a_s1: 3, a_s2: 9, d_1: 0.03, d_2: 0.06 });
+    const swapped = curves({ a_s1: 9, a_s2: 3, d_1: 0.06, d_2: 0.03 });
+    for (const reinf of ['', ' Reinf']) {
+        const mirrored = swapped['Moment' + reinf].map(
+            (/** @type {number} */ m) => -m);
+        assertClose(values['Moment' + reinf + ' Neg'], mirrored, 'Moment');
+        assertClose(values['Normal Force' + reinf + ' Neg'],
+                    swapped['Normal Force' + reinf], 'Normal Force');
+    }
+});
+
+test('N2: unsymmetric section, both sides meet at the end points', () => {
+    // Uniform compression and uniform tension are the same state for
+    // both sides, so the curve is closed there.
+    const values = curves({ a_s1: 3, a_s2: 9, d_1: 0.03, d_2: 0.06 });
+    const last = values['Moment Reinf'].length - 1;
+    const last_neg = values['Moment Reinf Neg'].length - 1;
+    assertClose(values['Moment Reinf Neg'][0], values['Moment Reinf'][0],
+                'M compression');
+    assertClose(values['Normal Force Reinf Neg'][0],
+                values['Normal Force Reinf'][0], 'N compression');
+    assertClose(values['Moment Reinf Neg'][last_neg],
+                values['Moment Reinf'][last], 'M tension');
+    assertClose(values['Normal Force Reinf Neg'][last_neg],
+                values['Normal Force Reinf'][last], 'N tension');
+    // more reinforcement on the a_s2 side: the end points are not at M = 0
+    assert.ok(Math.abs(values['Moment Reinf'][last]) > 1e-3);
 });

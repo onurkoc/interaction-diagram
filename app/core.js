@@ -49,13 +49,18 @@ import { strain_planes } from './strain_planes.js';
 
 /**
  * Capacity curves, moments in MNm, normal forces in MN.
+ * Right side (positive moment): 'Moment' with 'Normal Force'.
+ * Left side (negative moment): 'Moment Neg' with 'Normal Force Neg'.
+ * 'Reinf': with reinforcement, otherwise the plain concrete section.
  * @typedef {{
  *     'Moment': number[],
  *     'Moment Neg': number[],
  *     'Normal Force': number[],
+ *     'Normal Force Neg': number[],
  *     'Moment Reinf': number[],
  *     'Moment Reinf Neg': number[],
  *     'Normal Force Reinf': number[],
+ *     'Normal Force Reinf Neg': number[],
  * }} Values
  */
 
@@ -134,7 +139,9 @@ export function concrete_force(y, x, d, h_, b_, f_cd, eps_c1) {
 }
 
 /**
- * Capacity curve for one side of the diagram (a_s1 in tension).
+ * Capacity curve for one side of the diagram (a_s1 in tension,
+ * a_s2 in compression). For the other side it is called with the
+ * roles of the two layers swapped.
  * Returns the curve of the plain concrete and the curve with
  * reinforcement.
  * @param {number[]} epsilon_c  strains at the compressed edge
@@ -279,33 +286,30 @@ export function int_diagram({
                         'die Option ist in diesem Modus nicht zulässig.');
     }
 
-    if (d <= 0 || a_s1 < 0 || a_s2 < 0 || b_ <= 0 || gamma_c < 0 ||
-        gamma_d < 0 || gamma_s < 0 || d_1 < 0 || d_2 < 0 || alpha_cc <= 0) {
+    if (d <= 0 || h_ - d_2 <= 0 || a_s1 < 0 || a_s2 < 0 || b_ <= 0 ||
+        gamma_c < 0 || gamma_d < 0 || gamma_s < 0 || d_1 < 0 || d_2 < 0 ||
+        alpha_cc <= 0) {
         // parameter problems returns null
         return null;
     }
 
-    // epsilon values of the steel and the concrete
+    // right side of the diagram (positive moment): a_s1 in tension
     const [epsilon_c, epsilon_s1] = strain_planes(norm, { h_, d, d_2, f_yd });
-
     const { moment, n_force, moment_reinf, n_force_reinf } = one_side(
         epsilon_c, epsilon_s1,
         { h_, b_, d_1, d_2, a_s1, a_s2, f_cd, f_yd,
           e_steel: norm.e_steel, eps_c1: norm.eps_c1 });
 
-    /** @type {number[]} */
-    const moment_neg = [];
-    // left side of the diagram (concrete)
-    for (let i = 0; i < moment.length; i++) {
-        moment_neg.push(Math.abs(moment[i]) * -1);
-    }
-
-    /** @type {number[]} */
-    const moment_reinf_neg = [];
-    // left side of the diagram (with reinforcement)
-    for (let i = 0; i < moment_reinf.length; i++) {
-        moment_reinf_neg.push(Math.abs(moment_reinf[i]) * -1);
-    }
+    // left side of the diagram (negative moment): the same calculation
+    // with the roles swapped, a_s2 in tension and a_s1 in compression
+    const [epsilon_c_neg, epsilon_s2] = strain_planes(
+        norm, { h_, d: h_ - d_2, d_2: d_1, f_yd });
+    const neg = one_side(
+        epsilon_c_neg, epsilon_s2,
+        { h_, b_, d_1: d_2, d_2: d_1, a_s1: a_s2, a_s2: a_s1, f_cd, f_yd,
+          e_steel: norm.e_steel, eps_c1: norm.eps_c1 });
+    const moment_neg = neg.moment.map(m => -m);
+    const moment_reinf_neg = neg.moment_reinf.map(m => -m);
 
     /** @type {InputValues} */
     const input_values = {
@@ -328,9 +332,11 @@ export function int_diagram({
         'Moment': moment,
         'Moment Neg': moment_neg,
         'Normal Force': n_force,
+        'Normal Force Neg': neg.n_force,
         'Moment Reinf': moment_reinf,
         'Moment Reinf Neg': moment_reinf_neg,
         'Normal Force Reinf': n_force_reinf,
+        'Normal Force Reinf Neg': neg.n_force_reinf,
     };
 
     return [input_values, values];

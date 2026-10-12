@@ -95,9 +95,10 @@ export const en1992 = {
         return Math.max(h / 30, 0.02);
     },
 
-    // 6.1 (5), 6.1 (6), Bild 6.1: pivot points A, B, C (D2).
-    // legacy until the correction E3
-    strain_planes: { type: 'legacy' },
+    // 6.1 (5), 6.1 (6), Bild 6.1: pivot points A, B, C (D2),
+    // C at (1 - eps_c2 / eps_cu2) * h, up to uniform tension
+    strain_planes: { type: 'generated', pivot_c: true, tension_end: true,
+                     step: 0.0003, steps_c: 10 },
 
     check(p) {
         const messages = [];

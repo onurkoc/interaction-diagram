@@ -76,8 +76,8 @@ export const sia262 = {
 
     // SIA 262 does not regulate the pivot point C. The app uses it
     // by analogy to EN 1992-1-1 6.1 (5) as a conservative assumption (D5).
-    // legacy until the correction E3
-    strain_planes: { type: 'legacy' },
+    strain_planes: { type: 'generated', pivot_c: true, tension_end: true,
+                     step: 0.0003, steps_c: 10 },
 
     check(p) {
         const messages = [];
