@@ -90,9 +90,10 @@ test('xls_read: values are not corrected silently', () => {
     // a missing value
     assert.throws(() => read_rows([['n', 'm'], [-1000, null]]),
                   /Zeile 2: Ein Wert fehlt/);
-    // decimal comma in a text cell
-    assert.throws(() => read_rows([['n', 'm'], ['-1000,5', 100]]),
-                  /Zeile 2: «-1000,5» ist keine Zahl/);
+    // decimal comma in a text cell: rejected with the row number and a hint
+    assert.throws(
+        () => read_rows([['n', 'm'], [-1, 2], ['-1000,5', 100]]),
+        /Zeile 3: «-1000,5» ist keine Zahl\. Zelle als Zahl formatieren\./);
     // a number stored as text is accepted
     const [x, y] = read_rows([['n', 'm'], ['-1000.5', ' 100 ']]);
     assert.deepEqual(x, [100]);
