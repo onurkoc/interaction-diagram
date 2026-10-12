@@ -107,7 +107,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | C2 | erledigt mit dem Port: In `cult_i.js` ist das Ergebnis an dieser Stelle immer eine Zahl, die Typabfrage entfällt. Keine Änderung der Rechnung. |
 | C3 | umgesetzt: Bei m = 0 ist ein Punkt jenseits von reinem Zug oder zentrischem Druck «outside» |
 | N3 | umgesetzt: CULT-I verwendet auf beiden Seiten die bewehrte Kurve mit ihren eigenen Normalkräften |
-| N4 | offen |
+| N4 | umgesetzt: Bei mehreren Schnittpunkten gilt der äusserste (M-Richtung) bzw. der nächste (N-Richtung), kein Abbruch mehr |
 | N5, N6 | offen, mit der Oberfläche |
 | N8 | offen, mit dem Datei-Import |
 | E4 | bleibt (D3) |
