@@ -149,7 +149,7 @@ export function concrete_force(y, x, d, h_, b_, f_cd, eps_c1) {
  * @param {number} s.d_1
  * @param {number} s.d_2
  * @param {number} s.a_s1
- * @param {number} s.alpha  a_s1 / a_s2 as in legacy/core.py
+ * @param {number} s.a_s2
  * @param {number} s.f_cd
  * @param {number} s.f_yd
  * @param {number} s.e_steel
@@ -158,7 +158,7 @@ export function concrete_force(y, x, d, h_, b_, f_cd, eps_c1) {
  *            moment_reinf: number[], n_force_reinf: number[]}}
  */
 function one_side(epsilon_c, epsilon_s1,
-                  { h_, b_, d_1, d_2, a_s1, alpha, f_cd, f_yd, e_steel, eps_c1 }) {
+                  { h_, b_, d_1, d_2, a_s1, a_s2, f_cd, f_yd, e_steel, eps_c1 }) {
     const d = h_ - d_1;
     const a_s1_ = 0;  // indicating naked concrete interaction line
     const alpha_ = 1;  // again for naked concrete interaction line
@@ -211,7 +211,7 @@ function one_side(epsilon_c, epsilon_s1,
 
         // compression force steel (reinforcement)
         const f_s2_reinf = sign(eps_s2) *
-            Math.min((e_steel * Math.abs(eps_s2)), f_yd) * alpha * a_s1 / 10000;
+            Math.min((e_steel * Math.abs(eps_s2)), f_yd) * a_s2 / 10000;
 
         // tension force steel (reinforcement)
         const f_s1_reinf = sign(x) *
@@ -254,13 +254,6 @@ export function int_diagram({
     eccentricity = false,
 } = {}, norm = en1992) {
 
-    let alpha;
-    if (a_s2 === 0) {
-        // in case a_s2 defined as zero
-        alpha = 0;
-    } else {
-        alpha = a_s1 / a_s2;
-    }
     if (gamma_c === 0 || gamma_s === 0) {
         // Python raises a ZeroDivisionError here,
         // JavaScript would silently continue with Infinity
@@ -310,7 +303,7 @@ export function int_diagram({
 
     const { moment, n_force, moment_reinf, n_force_reinf } = one_side(
         epsilon_c, epsilon_s1,
-        { h_, b_, d_1, d_2, a_s1, alpha, f_cd, f_yd,
+        { h_, b_, d_1, d_2, a_s1, a_s2, f_cd, f_yd,
           e_steel: norm.e_steel, eps_c1: norm.eps_c1 });
 
     /** @type {number[]} */
