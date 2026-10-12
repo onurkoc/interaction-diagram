@@ -105,7 +105,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E2 (D1), damit C1 und N7 | umgesetzt im Rechenkern (`min_eccentricity_moments`, `cult_I_min_eccentricity`); Strahl M = ±e0·N und Tabelle folgen mit der Oberfläche |
 | E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. Fagus-Vergleich (D6) bestanden, siehe Abschnitt 6. |
 | C2 | erledigt mit dem Port: In `cult_i.js` ist das Ergebnis an dieser Stelle immer eine Zahl, die Typabfrage entfällt. Keine Änderung der Rechnung. |
-| C3 | offen |
+| C3 | umgesetzt: Bei m = 0 ist ein Punkt jenseits von reinem Zug oder zentrischem Druck «outside» |
 | N3 | offen |
 | N4 | offen |
 | N5, N6 | offen, mit der Oberfläche |
