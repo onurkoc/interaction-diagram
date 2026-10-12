@@ -261,11 +261,6 @@ export function int_diagram({
     } else {
         alpha = a_s1 / a_s2;
     }
-    if (norm.alpha_cc_raise_to !== undefined &&
-        alpha_cc < norm.alpha_cc_raise_to) {
-        // alpha_cc cannot be smaller than 0.85 (legacy, EN only)
-        alpha_cc = norm.alpha_cc_raise_to;
-    }
     if (gamma_c === 0 || gamma_s === 0) {
         // Python raises a ZeroDivisionError here,
         // JavaScript would silently continue with Infinity

@@ -45,7 +45,6 @@ Decisions D1..D7 and findings E1..E10: see NOTES.md.
  * @property {(p: NormParams) => number} f_cd_plain  for a_s1 = a_s2 = 0 (D7)
  * @property {(p: NormParams) => number} f_yd
  * @property {((h: number) => number) | null} min_eccentricity  null: no rule
- * @property {number} [alpha_cc_raise_to]  legacy behaviour (E5)
  * @property {StrainPlaneOptions} strain_planes
  * @property {(p: NormParams) => string[]} check  messages for invalid input
  * @property {string[]} notes  hints shown in the interface
@@ -96,10 +95,6 @@ export const en1992 = {
     min_eccentricity(h) {
         return Math.min(h / 30, 0.02);
     },
-
-    // core.py raises alpha_cc < 0.85 silently to 0.85 (E5),
-    // kept until the correction
-    alpha_cc_raise_to: 0.85,
 
     // 6.1 (5), 6.1 (6), Bild 6.1: pivot points A, B, C (D2).
     // legacy until the correction E3
