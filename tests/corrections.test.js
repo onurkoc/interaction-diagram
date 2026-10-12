@@ -6,7 +6,8 @@ contain reference values calculated with this app.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { int_diagram } from '../app/core.js';
+import { int_diagram, min_eccentricity_moments } from '../app/core.js';
+import { cult_I, cult_I_min_eccentricity } from '../app/cult_i.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { sia262 } from '../app/norms/sia262.js';
 import { assertClose } from './helpers.js';
@@ -103,4 +104,55 @@ test('N1: the compression reinforcement is a_s2', () => {
         // a_s in cm2, forces in MN
         assertClose(difference, -6 * f_yd / 10000, `a_s1 = ${a_s1}`);
     }
+});
+
+test('E2/D1: minimum eccentricity is applied to the load points', () => {
+    const e0 = 0.02;
+    // compression (n < 0): |m| is at least e0 * |n|, the sign is kept
+    assert.deepEqual(min_eccentricity_moments(0.01, -2, e0), [0.04]);
+    assert.deepEqual(min_eccentricity_moments(-0.01, -2, e0), [-0.04]);
+    // larger moments are not changed
+    assert.deepEqual(min_eccentricity_moments(0.1, -2, e0), [0.1]);
+    assert.deepEqual(min_eccentricity_moments(-0.1, -2, e0), [-0.1]);
+    // m = 0: both signs
+    assert.deepEqual(min_eccentricity_moments(0, -2, e0), [0.04, -0.04]);
+    // tension or no normal force: not changed
+    assert.deepEqual(min_eccentricity_moments(0.01, 0.5, e0), [0.01]);
+    assert.deepEqual(min_eccentricity_moments(0, 0, e0), [0]);
+});
+
+test('E2/D1: the resistance curve is not capped any more', () => {
+    const without = curves({ eccentricity: false });
+    const with_ecc = curves({ eccentricity: true });
+    assert.deepEqual(with_ecc, without);
+    assert.equal('x1_y1' in with_ecc, false);
+});
+
+test('E2/D1, C1: CULT-I uses the modified load point', () => {
+    const result = int_diagram({ h_: 0.30, d_1: 0.05, d_2: 0.05,
+                                 a_s1: 5.24, a_s2: 5.24, f_ck: 30 });
+    assert.notEqual(result, null);
+    const [input_values, values] = /** @type {any} */ (result);
+    const e0 = 0.02;
+
+    // small moment: same result as CULT-I of the modified point
+    const small = cult_I_min_eccentricity(0.01, -2, e0, input_values, values);
+    assert.deepEqual(small.moments, [0.04]);
+    assert.equal(small.cult_I, cult_I(0.04, -2, input_values, values));
+
+    // large moment: point and result unchanged
+    const large = cult_I_min_eccentricity(0.1, -2, e0, input_values, values);
+    assert.deepEqual(large.moments, [0.1]);
+    assert.equal(large.cult_I, cult_I(0.1, -2, input_values, values));
+
+    // m = 0: the less favourable of both sides governs
+    const zero = cult_I_min_eccentricity(0, -2, e0, input_values, values);
+    assert.deepEqual(zero.moments, [0.04, -0.04]);
+    const both = [cult_I(0.04, -2, input_values, values),
+                  cult_I(-0.04, -2, input_values, values)];
+    assert.equal(zero.cult_I, Math.min(.../** @type {number[]} */ (both)));
+
+    // modified point outside the curve
+    const outside = cult_I_min_eccentricity(0, -6.4, e0, input_values, values);
+    assert.equal(outside.cult_I, 'outside');
 });
