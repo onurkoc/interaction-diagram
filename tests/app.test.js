@@ -7,7 +7,7 @@ The tests check what follows from the rules of the interface
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
-         summary_text, sort_order }
+         summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE }
     from '../app/app.js';
 import { figure, min_cult_I } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
@@ -651,5 +651,77 @@ test('radial utilization: not defined for a plain concrete section', () => {
         assert.equal(result.points[0].inside, true);
         assert.doesNotMatch(summary_text(result.points, false, true),
                             /Ausnutzung/);
+    }
+});
+test('rewrite_number: only the decimal sign changes, the value stays', () => {
+    assert.equal(rewrite_number('1.35', ','), '1,35');
+    assert.equal(rewrite_number('1,35', '.'), '1.35');
+    assert.equal(rewrite_number('1,35', ','), '1,35');
+    // the digits stay as typed, nothing is rounded or shortened
+    assert.equal(rewrite_number('0.350', ','), '0,350');
+    assert.equal(rewrite_number('1.0', ','), '1,0');
+    assert.equal(rewrite_number(' 2.58 ', ','), '2,58');
+    assert.equal(rewrite_number('-0.5', ','), '-0,5');
+    assert.equal(rewrite_number('.5', ','), ',5');
+    assert.equal(rewrite_number('30', ','), '30');
+    // reading and rewriting give the same number
+    for (const text of ['1.35', '1,35', '0.03', '0,030', '2,58', '500', '-1.5',
+                        '.25', '7.', '0.1', '123456.789']) {
+        for (const decimal of [',', '.']) {
+            const written = rewrite_number(text, decimal);
+            assert.equal(parse_number(written), parse_number(text),
+                         `«${text}» -> «${written}»`);
+            assert.equal(written.includes(decimal === ',' ? '.' : ','), false);
+        }
+    }
+    // text that is not a number is not touched
+    for (const text of ['', ' ', 'abc', '1.2.3', '1,2,3', '1e3', '5 m']) {
+        assert.equal(rewrite_number(text, ','), text);
+    }
+});
+
+test('shown_messages: an empty input is no error before the field is left', () => {
+    const empty = raw({ h_: '', b_: '', a_s1: '', a_s2: '', d_1: '', d_2: '',
+                        f_ck: '', f_yk: '', gamma_d: '', eta_t: '' });
+    const { messages } = check_inputs(empty, sia262);
+    // all of them are missing values, nothing is wrong
+    assert.equal(messages.length, 10);
+    assert.ok(messages.every(message => message.missing === true));
+
+    // at the start: nothing is shown as an error
+    assert.deepEqual(shown_messages(messages, new Set(), false), []);
+    // after the user has left two fields: only these two
+    assert.deepEqual(
+        fields(shown_messages(messages, new Set(['b_', 'eta_t']), false)),
+        ['b_', 'eta_t']);
+    // with a file the values are needed: all of them
+    assert.equal(shown_messages(messages, new Set(), true).length, 10);
+
+    // a wrong value is always shown, touched or not
+    const wrong = check_inputs({ ...empty, h_: 'abc', gamma_d: '-1' }, sia262);
+    assert.deepEqual(fields(shown_messages(wrong.messages, new Set(), false)),
+                     ['h_', 'gamma_d']);
+    // messages of the norm, too
+    const norm_message = check_inputs(raw({ f_ck: '60' }), en1992);
+    assert.equal(shown_messages(norm_message.messages, new Set(), false).length, 1);
+});
+
+test('EXAMPLE: the values of the button give a calculation in both norms', () => {
+    // the placeholders of the inputs, eta_t = 0.85, gamma_d = 1.0
+    assert.deepEqual(EXAMPLE, {
+        h_: '0.35', b_: '1.0', a_s1: '2.58', d_1: '0.03', a_s2: '2.58',
+        d_2: '0.03', f_ck: '30', f_yk: '500', eta_t: '0.85', gamma_d: '1.0',
+    });
+    for (const norm of [en1992, sia262]) {
+        // as in the page: everything empty, then the example and the
+        // presets of the norm
+        const inputs = { ...raw(), ...EXAMPLE,
+                         gamma_c: String(norm.defaults['gamma_c']),
+                         gamma_s: String(norm.defaults['gamma_s']) };
+        const { params, messages } = check_inputs(inputs, norm);
+        assert.deepEqual(messages, []);
+        assert.equal(params.gamma_d, 1);
+        assert.equal(params.f_ck, 30);
+        assert.notEqual(calculate(params, norm, null, false, true), null);
     }
 });

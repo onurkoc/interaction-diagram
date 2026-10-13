@@ -56,6 +56,7 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
  * @typedef {Object} Message
  * @property {string} field  name of the input, '' if it is not a single one
  * @property {string} text
+ * @property {boolean} [missing]  true: the input is empty (not wrong)
  */
 
 /**
@@ -99,6 +100,46 @@ export function parse_number(text) {
 }
 
 /**
+ * The text of an input written again with the decimal sign of the
+ * interface, when the user leaves the field. Only the sign changes: the
+ * value and the number of digits stay as typed. Text that is not a
+ * number is not touched.
+ * @param {string} text
+ * @param {string} decimal  ',' or '.'
+ * @returns {string}
+ */
+export function rewrite_number(text, decimal) {
+    if (Number.isNaN(parse_number(text))) {
+        return text;
+    }
+    return text.trim().replace(/[.,]/, decimal);
+}
+
+/**
+ * Values of the button «Beispiel laden»: the placeholders of the inputs
+ * as real values. They are written into the fields, so the user sees
+ * what is calculated; nothing is calculated with placeholders.
+ */
+export const EXAMPLE = /** @type {Object<string, string>} */ ({
+    h_: '0.35', b_: '1.0', a_s1: '2.58', d_1: '0.03', a_s2: '2.58', d_2: '0.03',
+    f_ck: '30', f_yk: '500', eta_t: '0.85', gamma_d: '1.0',
+});
+
+/**
+ * The messages that are shown. An empty input is not an error as long as
+ * the user has not been in the field: it is shown only after the field
+ * was left, or when a file is loaded and the value is needed.
+ * @param {Message[]} messages  from check_inputs
+ * @param {Set<string>} touched  names of the inputs the user has left
+ * @param {boolean} has_file  load points are loaded
+ * @returns {Message[]}
+ */
+export function shown_messages(messages, touched, has_file) {
+    return messages.filter(message =>
+        !message.missing || has_file || touched.has(message.field));
+}
+
+/**
  * Check the input before every calculation (N5 in NOTES.md).
  * Invalid input is rejected with a message, nothing is corrected.
  * @param {RawInputs} raw
@@ -121,11 +162,11 @@ export function check_inputs(raw, norm) {
         const text = /** @type {Object<string, any>} */ (raw)[field];
         if (text.trim() === '') {
             if (field === 'gamma_d') {
-                messages.push({ field: field, text:
+                messages.push({ field: field, missing: true, text:
                     'Lastfaktor γ_d fehlt (Pflichtfeld ohne Vorgabe; ' +
                     '1,0, wenn Bemessungswerte importiert werden).' });
             } else {
-                messages.push({ field: field,
+                messages.push({ field: field, missing: true,
                                 text: `${LABELS[field]} fehlt.` });
             }
             continue;
@@ -168,7 +209,7 @@ export function check_inputs(raw, norm) {
     if (norm.inputs.includes('eta_t')) {
         if (raw.eta_t === '') {
             // no silent preset (SIA 262 4.2.1.3)
-            messages.push({ field: 'eta_t', text:
+            messages.push({ field: 'eta_t', missing: true, text:
                 'η_t fehlt: bitte 1,0 / 0,85 / 1,2 wählen (SIA 262 4.2.1.3).' });
             norm_inputs_complete = false;
         } else {
@@ -614,6 +655,9 @@ export function start({ XLSX, Plotly }) {
     const table_box = element('table');
     const summary = element('summary');
 
+    // names of the inputs the user has left
+    /** @type {Set<string>} */
+    const touched = new Set();
     // sorting of the table: head of the column and direction
     let sort = { head: 'Nr.', descending: false };
     /** @type {Loads | null} */
@@ -727,11 +771,13 @@ export function start({ XLSX, Plotly }) {
         const raw = raw_inputs();
         const { params, messages } = check_inputs(raw, norm);
 
-        // mark the inputs with a message
+        // Mark the inputs with a message. An empty field is not marked
+        // before the user has been in it (or a file needs the value).
+        const shown = shown_messages(messages, touched, loads !== null);
         for (const field of form.querySelectorAll('.invalid')) {
             field.classList.remove('invalid');
         }
-        for (const message of messages) {
+        for (const message of shown) {
             if (message.field === '') {
                 continue;
             }
@@ -740,17 +786,24 @@ export function start({ XLSX, Plotly }) {
             marked.classList.add('invalid');
         }
 
-        let texts = messages.map(message => message.text);
+        let texts = shown.map(message => message.text);
+        let is_error = true;
         /** @type {Result | null} */
         let result = null;
-        if (texts.length === 0) {
+        if (messages.length === 0) {
             try {
                 result = calculate(params, norm, loads, raw.cult, raw.radial);
             } catch (error) {
                 texts = [(error instanceof Error) ? error.message : String(error)];
             }
+        } else if (shown.length === 0) {
+            // values are still missing, nothing is wrong: a neutral hint
+            texts = ['Querschnitt und Baustoffe eingeben, dann erscheint ' +
+                     'das Diagramm.'];
+            is_error = false;
         }
         fill(messages_box, texts, 'p');
+        messages_box.className = is_error ? 'error' : 'info';
         messages_box.hidden = texts.length === 0;
 
         if (result === null) {
@@ -830,6 +883,34 @@ export function start({ XLSX, Plotly }) {
 
     form.addEventListener('input', update);
     form.addEventListener('submit', event => event.preventDefault());
+    form.addEventListener('focusout', event => {
+        const target = /** @type {HTMLInputElement} */ (event.target);
+        if (target.tagName !== 'INPUT') {
+            return;
+        }
+        // from now on an empty field is an error
+        touched.add((target.type === 'radio') ? target.name : target.id);
+        if (target.type === 'text') {
+            // decimal sign of the interface; the value does not change
+            target.value = rewrite_number(target.value, ',');
+        }
+        update();
+    });
+    element('example').addEventListener('click', () => {
+        // the values are written into the fields, visible to the user
+        for (const [field, value] of Object.entries(EXAMPLE)) {
+            if (field === 'eta_t') {
+                const radio = /** @type {HTMLInputElement | null} */ (
+                    form.querySelector(`input[name="eta_t"][value="${value}"]`));
+                if (radio !== null) {
+                    radio.checked = true;
+                }
+            } else {
+                input(field).value = rewrite_number(value, ',');
+            }
+        }
+        update();
+    });
 
     file_input.addEventListener('change', () => {
         if (file_input.files !== null && file_input.files.length > 0) {
