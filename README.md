@@ -2,8 +2,8 @@
 
 Interaction diagram (bending moment M and normal force N) for rectangular
 reinforced concrete cross-sections, with the index CULT-I for tunnel
-linings. The app runs in the browser only: no server, no installation,
-and the load file never leaves the computer.
+linings. Everything is calculated in the browser; the load file is not
+uploaded.
 
 Two design codes can be chosen:
 
@@ -31,7 +31,7 @@ The most important ones:
 - Reinforcing steel: ideal plastic, E_s = 200 GPa, steel strain limited to
   12 ‰ (permitted, not required by the codes).
 - Strain planes with the pivot points A, B and C (EN 1992-1-1 6.1 (5),
-  Bild 6.1). SIA 262 does not regulate pivot C; the app uses it there as
+  Figure 6.1). SIA 262 does not regulate pivot C; the app uses it there as
   a conservative assumption.
 - Plain concrete (a_s1 = a_s2 = 0): reduced design strength, see NOTES.md.
 
@@ -41,6 +41,10 @@ not yet by a comparison with independent numbers.
 
 ## How to use it
 
+0. Open the app. Locally: double-click `start.cmd` (Windows, needs
+   Python 3) or run `npx http-server app`, see
+   [Running it locally](#running-it-locally). A link to the app on the
+   web follows.
 1. Choose the code on the first page. It can be changed at any time; the
    input is kept where it is valid for both codes.
 2. Enter the cross-section and the materials. These fields have no preset
@@ -135,12 +139,16 @@ from this paper:
 > linings under geotechnical uncertainty. Geomechanics and Tunnelling 9
 > (2016), No. 2.
 
-![CULT-I formula](images/Cult-I_formula.png)
+Equation (4) of the paper:
 
-![CULT-I](images/Cult-I.png)
+$$
+\text{CULT-I} = \sqrt{\frac{N_{rel,i}^2 + M_{rel,i}^2}{N_{rel,max}^2 + M_{rel,max}^2}}
+$$
 
-(In the sketch the normal force is on the horizontal axis; the app draws
-it on the vertical axis.)
+![The distances of CULT-I in the diagram of the app](images/cult-i.svg)
+
+The sketch shows the four distances with the axes of the app: N vertical
+with compression at the top, M horizontal.
 
 **CULT-I is a reserve index, not a utilization: 0 means the point is on
 the capacity curve (limit state), a large value means a large reserve.**
@@ -178,15 +186,23 @@ Keep in mind:
 
 ## Running it locally
 
-The folder `app/` is the complete app. Serve it with any static file
-server and open `index.html`, for example with Node.js:
+The folder `app/` is the complete app. It has to be opened through a web
+server; any static file server will do.
+
+On Windows, double-click `start.cmd`. It serves `app/` with Python 3 on
+<http://localhost:8000/> and opens the page. It uses Anaconda at
+`C:\ProgramData\anaconda3` if it is there, otherwise the `python` of the
+PATH. Nothing is installed.
+
+With Node.js:
 
 ```sh
 npx http-server app
 ```
 
 Opening `index.html` directly from the disk (`file://`) does not work,
-because browsers do not load JavaScript modules that way.
+because browsers do not load JavaScript modules that way. The page then
+shows a message instead of the app.
 
 ## For developers
 
@@ -207,6 +223,7 @@ app/                the static app
   loads.js          width and load factor
   norms/            configuration of SIA 262 and EN 1992-1-1
   vendor/           Plotly.js, SheetJS (with their licences)
+start.cmd           starts the app locally (Windows, Python 3)
 legacy/             the original Python code of 2020 (Dash), reference only
 tests/              tests, run with node
 NOTES.md            assumptions, findings and decisions (German)
