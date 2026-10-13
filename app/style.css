@@ -1,0 +1,264 @@
+/* M-N interaction diagram: plain and functional */
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    line-height: 1.4;
+    color: #222;
+    background: #fff;
+}
+
+main {
+    max-width: 1500px;
+    margin: 0 auto;
+    padding: 12px 16px 32px;
+}
+
+h1 {
+    font-size: 24px;
+    margin: 8px 0;
+    padding-bottom: 6px;
+    border-bottom: thin solid lightgrey;
+}
+
+h2 {
+    font-size: 18px;
+}
+
+header p {
+    margin: 6px 0 12px;
+}
+
+header a {
+    margin-left: 12px;
+}
+
+.small {
+    font-size: 13px;
+    color: #555;
+}
+
+.error {
+    color: #b00020;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+/* landing page */
+
+.norms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.norm {
+    flex: 1 1 260px;
+    max-width: 420px;
+    padding: 20px;
+    border: 2px solid #1f4e79;
+    border-radius: 6px;
+    color: #1f4e79;
+    text-decoration: none;
+}
+
+.norm:hover,
+.norm:focus {
+    background: #eaf1f8;
+}
+
+.norm strong {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 6px;
+}
+
+/* file */
+
+#drop-zone {
+    padding: 10px 12px;
+    border: 1px dashed #666;
+    border-radius: 5px;
+    margin-bottom: 12px;
+}
+
+#drop-zone.over {
+    background: #eaf1f8;
+    border-color: #1f4e79;
+}
+
+#drop-zone p {
+    margin: 6px 0 0;
+}
+
+#file-message:empty {
+    display: none;
+}
+
+/* inputs on the left, diagram on the right */
+
+.layout {
+    display: grid;
+    grid-template-columns: 290px minmax(0, 1fr);
+    gap: 16px;
+    align-items: start;
+}
+
+fieldset {
+    margin: 0 0 12px;
+    padding: 8px 10px 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+legend {
+    font-weight: bold;
+    padding: 0 4px;
+}
+
+label {
+    display: block;
+    margin-top: 6px;
+    font-size: 13px;
+}
+
+input[type="text"] {
+    display: block;
+    width: 100%;
+    margin-top: 2px;
+    padding: 5px 6px;
+    font-size: 15px;
+    border: 1px solid #888;
+    border-radius: 3px;
+}
+
+label.check {
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+    margin-top: 8px;
+}
+
+.choice {
+    margin-top: 8px;
+    padding: 4px 6px;
+    font-size: 13px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+}
+
+.choice label.check {
+    display: inline-flex;
+    margin-right: 12px;
+}
+
+input.invalid,
+.choice.invalid {
+    border-color: #b00020;
+    background: #fdecee;
+}
+
+fieldset p {
+    margin: 6px 0 0;
+}
+
+/* output */
+
+#messages {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #b00020;
+    border-radius: 5px;
+    background: #fdecee;
+}
+
+#messages p {
+    margin: 2px 0;
+}
+
+#diagram {
+    width: 100%;
+    height: 720px;
+}
+
+#diagram:empty {
+    height: 0;
+}
+
+#hints {
+    padding-left: 20px;
+}
+
+#hints li {
+    margin-bottom: 3px;
+}
+
+/* table of the load points */
+
+#table {
+    max-height: 520px;
+    overflow: auto;
+    border: 1px solid #ccc;
+}
+
+#table:empty {
+    border: none;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+    padding: 3px 8px;
+    text-align: right;
+    white-space: nowrap;
+    border-bottom: 1px solid #e4e4e4;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #e2e2e2;
+}
+
+td:last-child,
+th:last-child {
+    text-align: left;
+}
+
+tr.outside td {
+    background: #fdecee;
+    color: #b00020;
+}
+
+tr.above td {
+    background: #fff6d6;
+}
+
+footer {
+    margin-top: 16px;
+}
+
+/* small screen: one column */
+
+@media (max-width: 800px) {
+    .layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #diagram {
+        height: 460px;
+    }
+}
