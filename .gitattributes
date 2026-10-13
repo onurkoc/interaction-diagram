@@ -1,2 +1,4 @@
 # third-party files are stored exactly as downloaded
 app/vendor/** -text
+# Windows command files need CRLF line ends
+*.cmd text eol=crlf
