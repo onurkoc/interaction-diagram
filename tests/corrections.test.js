@@ -360,3 +360,27 @@ test('N10: a point on the curve gives 0', () => {
     assert.equal(cult_I(0.5, -0.5, input_values, values), 0);
     assert.equal(cult_I(-0.5, -1.5, input_values, values), 0);
 });
+
+test('N10: N_rel,i is the distance to the nearest point of the closed curve', () => {
+    // Curve with ends that are not at M = 0 (as with unsymmetric
+    // reinforcement): both sides start and end at M = 0.25.
+    const n = [-2, -1, 0];
+    const values = /** @type {any} */ ({
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0.25, 1, 0.25],
+        'Normal Force Reinf': n,
+        'Moment Reinf Neg': [0.25, -1, 0.25],
+        'Normal Force Reinf Neg': n,
+    });
+    const input_values = /** @type {any} */ ({ a_s1: 3, a_s2: 9 });
+    // Point (0.125, -1.75). For this N the curve is at M = 0.4375 (right)
+    // and M = -0.0625 (left): inside, M_rel,i = 0.4375 - 0.125.
+    // For M = 0.125 the right side has no point at all (M >= 0.25); the
+    // left side is at N = -1.9 and N = -0.1: N_rel,i = 0.15.
+    // M_rel,max = 1, N_rel,max = -1 - (-2) = 1
+    const expected = Math.sqrt((0.3125 ** 2 + 0.15 ** 2) / (1 ** 2 + 1 ** 2));
+    const result = /** @type {number} */ (
+        cult_I(0.125, -1.75, input_values, values));
+    assert.ok(Math.abs(result - expected) <= 0.0005);
+});
