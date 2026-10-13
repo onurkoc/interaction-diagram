@@ -19,3 +19,7 @@ The files in this folder are excluded from the type check
 library is passed as an argument (see `app/xls_read.js`, `app/app.js`).
 `plotly-basic.min.js` is a classic script that sets `window.Plotly`;
 `index.html` loads it and passes it on.
+
+On Cloudflare Pages these files are kept in the browser for one year
+(`app/_headers`). A new version of a library therefore needs a new file
+name, see DEPLOY.md.
