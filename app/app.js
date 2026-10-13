@@ -887,6 +887,16 @@ export function start({ XLSX, Plotly }) {
         table_box.replaceChildren(table_element);
     }
 
+    /**
+     * Small screen: the legend is text below the diagram.
+     * @returns {boolean}
+     */
+    function is_narrow() {
+        return window.innerWidth < 700;
+    }
+    // the kind of legend of the diagram that is shown
+    let drawn_narrow = is_narrow();
+
     /** Check the input, calculate and show everything. */
     function update() {
         if (norm === null) {
@@ -934,11 +944,16 @@ export function start({ XLSX, Plotly }) {
             example_note.hidden = true;
             Plotly.purge(diagram);
             diagram.replaceChildren();
+            diagram.hidden = true;
             hints_list.replaceChildren();
             show_table([], {});
             return;
         }
-        const narrow = window.innerWidth < 700;
+        const narrow = is_narrow();
+        drawn_narrow = narrow;
+        // The box has to have its size before Plotly draws: Plotly reads
+        // the size of the box once, and takes 450 px for a height of 0.
+        diagram.hidden = false;
         // example values are marked above the diagram and in the legend
         const example = example_state.marked;
         example_note.hidden = !example;
@@ -1157,6 +1172,13 @@ export function start({ XLSX, Plotly }) {
         update();
     });
 
+    // Plotly follows the size of the box itself (responsive); the kind of
+    // legend is chosen here, so it is drawn again when the limit is passed
+    window.addEventListener('resize', () => {
+        if (is_narrow() !== drawn_narrow) {
+            update();
+        }
+    });
     window.addEventListener('hashchange', route);
     route();
     apply_language();
