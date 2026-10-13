@@ -112,6 +112,49 @@ function index(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
  * @returns {number | 'outside'}
  */
 export function cult_I(m, n, input_values, values) {
+    const details = cult_I_details(m, n, values);
+    if (details === 'outside') {
+        return 'outside';
+    }
+    return details.cult_I;
+}
+
+/**
+ * CULT-I with the values it is calculated from, so that the result can
+ * be checked by hand.
+ * @typedef {Object} CultIDetails
+ * @property {number} cult_I  rounded to three decimals
+ * @property {number} m_rel_i
+ * @property {number} n_rel_i
+ * @property {number} m_rel_max  of the governing side
+ * @property {number} n_rel_max  of the governing side
+ */
+
+/**
+ * @param {number} m_rel_i
+ * @param {number} n_rel_i
+ * @param {number} m_rel_max
+ * @param {number} n_rel_max
+ * @returns {CultIDetails}
+ */
+function details_of(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
+    return {
+        cult_I: round3(index(m_rel_i, n_rel_i, m_rel_max, n_rel_max)),
+        m_rel_i: m_rel_i,
+        n_rel_i: n_rel_i,
+        m_rel_max: m_rel_max,
+        n_rel_max: n_rel_max,
+    };
+}
+
+/**
+ * CULT-I of a point, see cult_I.
+ * @param {number} m  x coordinate of a point, moment
+ * @param {number} n  y coordinate of a point, normal force
+ * @param {Values} values  resulting values from int_diagram
+ * @returns {CultIDetails | 'outside'}
+ */
+export function cult_I_details(m, n, values) {
     // The curves with reinforcement are the resistance on both sides.
     // Without reinforcement they are the same as the concrete curves.
     const limit_x_pos = values['Moment Reinf'];
@@ -183,7 +226,7 @@ export function cult_I(m, n, input_values, values) {
         // only for a point on the compression side of the centre, towards
         // the compression end (assumption, see NOTES.md).
         const n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        return round3(index(m_rel_i, n_rel_i, m_rel_max_pos, n_rel_max_pos));
+        return details_of(m_rel_i, n_rel_i, m_rel_max_pos, n_rel_max_pos);
     } else if (m === 0) {
         // M_rel,i is the moment of the curve for the normal force n,
         // towards each side
@@ -195,17 +238,20 @@ export function cult_I(m, n, input_values, values) {
         const n_rel_i = min(y2.map(y => Math.abs(y - n)).concat(
             [distance_to_ends(n, limit_y)]));
         // both sides, the smaller result governs
-        return round3(Math.min(
-            index(m_rel_i_pos, n_rel_i, m_rel_max_pos, n_rel_max_pos),
-            index(m_rel_i_neg, n_rel_i, m_rel_max_neg, n_rel_max_neg)));
+        const pos = details_of(m_rel_i_pos, n_rel_i,
+                               m_rel_max_pos, n_rel_max_pos);
+        const neg = details_of(m_rel_i_neg, n_rel_i,
+                               m_rel_max_neg, n_rel_max_neg);
+        return (neg.cult_I < pos.cult_I) ? neg : pos;
     } else {
         if (y2.length === 0) {
             return 'outside';
         }
-        const m_rel_i = min(x1_neg) - m;
+        // distance as a positive number
+        const m_rel_i = m - min(x1_neg);
         // the nearest of all intersection points, as on the positive side
         const n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        return round3(index(m_rel_i, n_rel_i, m_rel_max_neg, n_rel_max_neg));
+        return details_of(m_rel_i, n_rel_i, m_rel_max_neg, n_rel_max_neg);
     }
 }
 
@@ -220,21 +266,29 @@ export function cult_I(m, n, input_values, values) {
  * @param {number} e0  minimum eccentricity [m]
  * @param {InputValues} input_values
  * @param {Values} values
- * @returns {{moments: number[], cult_I: number | 'outside'}}
- *     moments: the modified moment(s) used for the check
+ * @returns {{moments: number[], cult_I: number | 'outside',
+ *            m_governing: number, details: CultIDetails | 'outside'}}
+ *     moments: the modified moment(s) used for the check;
+ *     m_governing: the one of them that governs, with its details
  */
 export function cult_I_min_eccentricity(m, n, e0, input_values, values) {
     const moments = min_eccentricity_moments(m, n, e0);
-    /** @type {number | 'outside'} */
+    /** @type {CultIDetails | 'outside'} */
     let governing = 'outside';
+    let m_governing = moments[0];
     for (let i = 0; i < moments.length; i++) {
-        const result = cult_I(moments[i], n, input_values, values);
+        const result = cult_I_details(moments[i], n, values);
         if (result === 'outside') {
-            return { moments: moments, cult_I: 'outside' };
+            return { moments: moments, cult_I: 'outside',
+                     m_governing: moments[i], details: 'outside' };
         }
-        if (i === 0 || (governing !== 'outside' && result < governing)) {
+        if (i === 0 || (governing !== 'outside' &&
+                        result.cult_I < governing.cult_I)) {
             governing = result;
+            m_governing = moments[i];
         }
     }
-    return { moments: moments, cult_I: governing };
+    return { moments: moments,
+             cult_I: (governing === 'outside') ? 'outside' : governing.cult_I,
+             m_governing: m_governing, details: governing };
 }

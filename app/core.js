@@ -45,6 +45,12 @@ import { strain_planes } from './strain_planes.js';
  * @property {number} f_yk
  * @property {number} alpha_cc
  * @property {boolean} eccentricity
+ * @property {string} norm  name of the norm (not in legacy/core.py)
+ * @property {number} f_cd  design strength used for the curves [N/mm2]
+ * @property {number} f_yd  [N/mm2]
+ * @property {boolean} plain  true: a_s1 = a_s2 = 0, f_cd is reduced (D7)
+ * @property {number} [alpha_cc_pl]  EN only
+ * @property {number} [eta_t]  SIA only
  */
 
 /**
@@ -326,6 +332,13 @@ export function int_diagram({
         'f_yk': f_yk,
         'alpha_cc': alpha_cc,
         'eccentricity': eccentricity,
+        // not in legacy/core.py: what was really used, for the legend
+        'norm': norm.name,
+        'f_cd': f_cd,
+        'f_yd': f_yd,
+        'plain': a_s1 === 0 && a_s2 === 0,
+        'alpha_cc_pl': alpha_cc_pl,
+        'eta_t': eta_t,
     };
     /** @type {Values} */
     const values = {

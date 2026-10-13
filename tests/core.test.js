@@ -30,9 +30,11 @@ for (const c of reference.cases) {
         assert.notEqual(result, null);
         const [input_values, values] = /** @type {any} */ (result);
 
-        assert.deepEqual(Object.keys(input_values),
-                         Object.keys(c.result.input_values));
-        for (const key of Object.keys(c.result.input_values)) {
+        // all keys of legacy/core.py, in the same order; core.js adds
+        // more keys behind them (norm, f_cd, f_yd, ...)
+        const keys = Object.keys(c.result.input_values);
+        assert.deepEqual(Object.keys(input_values).slice(0, keys.length), keys);
+        for (const key of keys) {
             assertClose(input_values[key], c.result.input_values[key],
                         `input_values.${key}`);
         }
