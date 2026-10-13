@@ -196,8 +196,11 @@ Keep in mind:
   are comparable only to a limited extent.**
 - In unusual cases CULT-I can be above 1. The value is then shown as it is
   and marked, it is not capped.
-- The table shows M_rel,i, N_rel,i, M_rel,max and N_rel,max for every load
-  point, so the index can be checked by hand.
+- The table shows M_rel,i, N_rel,i, M_rel,max, N_rel,max and the two
+  ratios for every load point, so the index can be checked by hand.
+- A click on a column head sorts the table, a second click reverses the
+  order. Points outside of the curve have no CULT-I and stay at the end.
+  The number of a point is always its row in the file.
 
 ## Running it locally
 

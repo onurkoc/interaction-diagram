@@ -285,8 +285,10 @@ export function calculate(params, norm, loads, with_cult) {
  * @param {LoadPoint[]} points
  * @param {boolean} with_eccentricity  show the modified moment
  * @param {boolean} with_cult
- * @returns {{head: string[], rows: string[][], marks: string[]}}
- *     marks: '' / 'outside' / 'above' (CULT-I > 1) for each row
+ * @returns {{head: string[], rows: string[][], marks: string[],
+ *            keys: SortKey[][]}}
+ *     marks: '' / 'outside' / 'above' (CULT-I > 1) for each row;
+ *     keys: the value behind each cell, for sorting (sort_order)
  */
 export function table(points, with_eccentricity, with_cult) {
     const head = ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]'];
@@ -295,22 +297,33 @@ export function table(points, with_eccentricity, with_cult) {
     }
     if (with_cult) {
         head.push('M_rel,i [kNm]', 'N_rel,i [kN]',
-                  'M_rel,max [kNm]', 'N_rel,max [kN]', 'CULT-I', 'Hinweis');
+                  'M_rel,max [kNm]', 'N_rel,max [kN]',
+                  'M_rel,i / M_rel,max', 'N_rel,i / N_rel,max',
+                  'CULT-I', 'Hinweis');
     }
     /** @type {string[][]} */
     const rows = [];
+    /** @type {SortKey[][]} */
+    const keys = [];
     /** @type {string[]} */
     const marks = [];
     points.forEach((p, i) => {
+        // the number of the point is the row of the file, it stays with
+        // the point when the table is sorted
         const row = [String(i + 1), fmt(p.n * 1000, 1), fmt(p.m * 1000, 2)];
+        /** @type {SortKey[]} */
+        const key = [i + 1, p.n * 1000, p.m * 1000];
         if (with_eccentricity) {
             row.push(fmt(p.m_mod * 1000, 2));
+            key.push(p.m_mod * 1000);
         }
         let mark = '';
         if (with_cult && p.cult !== null) {
             if (p.cult === 'outside') {
-                row.push('', '', '', '', cult_text(p.cult),
-                         'Punkt ausserhalb der Kurve');
+                const hint = 'Punkt ausserhalb der Kurve';
+                row.push('', '', '', '', '', '', cult_text(p.cult), hint);
+                // no values: null is sorted to the end
+                key.push(null, null, null, null, null, null, null, hint);
                 mark = 'outside';
             } else {
                 let hint = '';
@@ -319,17 +332,66 @@ export function table(points, with_eccentricity, with_cult) {
                     hint = 'CULT-I > 1, siehe Hinweis';
                     mark = 'above';
                 }
+                const m_ratio = p.cult.m_rel_i / p.cult.m_rel_max;
+                const n_ratio = p.cult.n_rel_i / p.cult.n_rel_max;
                 row.push(fmt(p.cult.m_rel_i * 1000, 2),
                          fmt(p.cult.n_rel_i * 1000, 1),
                          fmt(p.cult.m_rel_max * 1000, 2),
                          fmt(p.cult.n_rel_max * 1000, 1),
+                         fmt(m_ratio, 3), fmt(n_ratio, 3),
                          cult_text(p.cult), hint);
+                key.push(p.cult.m_rel_i * 1000, p.cult.n_rel_i * 1000,
+                         p.cult.m_rel_max * 1000, p.cult.n_rel_max * 1000,
+                         m_ratio, n_ratio, p.cult.cult_I,
+                         (hint === '') ? null : hint);
             }
         }
         rows.push(row);
+        keys.push(key);
         marks.push(mark);
     });
-    return { head: head, rows: rows, marks: marks };
+    return { head: head, rows: rows, marks: marks, keys: keys };
+}
+
+/**
+ * Value of a cell for sorting: a number, a text, or null for an empty
+ * cell (e.g. CULT-I of a point outside of the curve).
+ * @typedef {number | string | null} SortKey
+ */
+
+/**
+ * Order of the rows of the table when it is sorted by one column.
+ * Numbers are compared as numbers, not as text. Empty cells (null) are
+ * always at the end, ascending and descending. Rows with the same value
+ * keep the order of the file.
+ * @param {SortKey[][]} keys  from table()
+ * @param {number} column
+ * @param {boolean} descending
+ * @returns {number[]} indices of the rows in the new order
+ */
+export function sort_order(keys, column, descending) {
+    const order = keys.map((_, i) => i);
+    order.sort((a, b) => {
+        const key_a = keys[a][column];
+        const key_b = keys[b][column];
+        if (key_a === null || key_b === null) {
+            if (key_a === null && key_b === null) {
+                return a - b;
+            }
+            return (key_a === null) ? 1 : -1;
+        }
+        let difference;
+        if (typeof key_a === 'number' && typeof key_b === 'number') {
+            difference = key_a - key_b;
+        } else {
+            difference = String(key_a).localeCompare(String(key_b), 'de');
+        }
+        if (difference === 0) {
+            return a - b;
+        }
+        return descending ? -difference : difference;
+    });
+    return order;
 }
 
 /**
@@ -477,6 +539,8 @@ export function start({ XLSX, Plotly }) {
     const table_box = element('table');
     const summary = element('summary');
 
+    // sorting of the table: head of the column and direction
+    let sort = { head: 'Nr.', descending: false };
     /** @type {Loads | null} */
     let loads = null;
     /** @type {Norm | null} */
@@ -533,24 +597,48 @@ export function start({ XLSX, Plotly }) {
             table_box.replaceChildren();
             return;
         }
-        const { head, rows, marks } = table(points, with_eccentricity, with_cult);
+        const { head, rows, marks, keys } = table(points, with_eccentricity,
+                                                  with_cult);
+        // the column of the last click, if the table still has it
+        let column = head.indexOf(sort.head);
+        if (column === -1) {
+            sort = { head: 'Nr.', descending: false };
+            column = 0;
+        }
         const table_element = document.createElement('table');
         const head_row = table_element.createTHead().insertRow();
-        for (const text of head) {
+        head.forEach((text, i) => {
             const cell = document.createElement('th');
-            cell.textContent = text;
+            // a button, so that the head can be used with the keyboard
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.title = 'Sortieren';
+            let arrow = '';
+            if (i === column) {
+                arrow = sort.descending ? ' ▼' : ' ▲';
+                cell.setAttribute('aria-sort',
+                                  sort.descending ? 'descending' : 'ascending');
+            }
+            button.textContent = text + arrow;
+            button.addEventListener('click', () => {
+                // first click ascending, second click descending
+                sort = { head: text,
+                         descending: sort.head === text && !sort.descending };
+                show_table(points, with_eccentricity, with_cult);
+            });
+            cell.append(button);
             head_row.append(cell);
-        }
+        });
         const body = table_element.createTBody();
-        rows.forEach((row, i) => {
+        for (const i of sort_order(keys, column, sort.descending)) {
             const table_row = body.insertRow();
             if (marks[i] !== '') {
                 table_row.className = marks[i];
             }
-            for (const text of row) {
+            for (const text of rows[i]) {
                 table_row.insertCell().textContent = text;
             }
-        });
+        }
         table_box.replaceChildren(table_element);
     }
 

@@ -247,6 +247,24 @@ th:last-child {
     text-align: left;
 }
 
+/* a click on the head sorts the table */
+th button {
+    width: 100%;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: bold;
+    color: inherit;
+    text-align: inherit;
+    cursor: pointer;
+}
+
+th button:hover,
+th button:focus-visible {
+    text-decoration: underline;
+}
+
 tr.outside td {
     background: #fdecee;
     color: #b00020;

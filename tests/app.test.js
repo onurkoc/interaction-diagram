@@ -7,7 +7,7 @@ The tests check what follows from the rules of the interface
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
-         summary_text }
+         summary_text, sort_order }
     from '../app/app.js';
 import { figure, min_cult_I } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
@@ -212,14 +212,25 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     const full = table(points, true, true);
     assert.deepEqual(full.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]',
         'M_Ed,mod [kNm]', 'M_rel,i [kNm]', 'N_rel,i [kN]',
-        'M_rel,max [kNm]', 'N_rel,max [kN]', 'CULT-I', 'Hinweis']);
+        'M_rel,max [kNm]', 'N_rel,max [kN]',
+        'M_rel,i / M_rel,max', 'N_rel,i / N_rel,max', 'CULT-I', 'Hinweis']);
     // decimal comma in all output
     assert.deepEqual(full.rows[0], ['1', '-1500,0', '100,00', '100,00',
-        '200,00', '1250,0', '400,00', '2500,0', '0,500', '']);
+        '200,00', '1250,0', '400,00', '2500,0',
+        // the two ratios with three decimals: 0.2 / 0.4 and 1.25 / 2.5
+        '0,500', '0,500', '0,500', '']);
     assert.deepEqual(full.rows[1], ['2', '-1000,0', '900,00', '900,00',
-        '', '', '', '', 'ausserhalb', 'Punkt ausserhalb der Kurve']);
+        '', '', '', '', '', '', 'ausserhalb', 'Punkt ausserhalb der Kurve']);
     assert.equal(full.rows[2][3], '60,00');
-    assert.equal(full.rows[2][8], '1,200');
+    assert.deepEqual(full.rows[2].slice(8, 11), ['0,750', '1,200', '1,200']);
+    // the values behind the cells, for sorting: numbers, not text
+    assert.deepEqual(full.keys[0], [1, -1500, 100, 100, 200, 1250, 400, 2500,
+                                    0.5, 0.5, 0.5, null]);
+    assert.deepEqual(full.keys[1].slice(4), [null, null, null, null, null,
+        null, null, 'Punkt ausserhalb der Kurve']);
+    for (const key of full.keys) {
+        assert.equal(key.length, full.head.length);
+    }
     assert.deepEqual(full.marks, ['', 'outside', 'above']);
     for (const row of full.rows) {
         assert.equal(row.length, full.head.length);
@@ -407,4 +418,104 @@ test('figure: load points inside and outside are two traces with their numbers',
         trace => /** @type {any} */ (trace).name);
     assert.equal(names.length, 3);
     assert.match(names[2], /^Lastpunkte innerhalb: 1 von 1<br>/);
+});
+test('sort_order: numbers are sorted as numbers, both directions', () => {
+    // as text, "-1000" < "-200" < "-30" < "5" < "50" would not be this order
+    const keys = [[1, -30], [2, 50], [3, -1000], [4, 5], [5, -200]];
+    assert.deepEqual(sort_order(keys, 1, false), [2, 4, 0, 3, 1]);
+    assert.deepEqual(sort_order(keys, 1, true), [1, 3, 0, 4, 2]);
+    // by the number of the point: the order of the file
+    assert.deepEqual(sort_order(keys, 0, false), [0, 1, 2, 3, 4]);
+    assert.deepEqual(sort_order(keys, 0, true), [4, 3, 2, 1, 0]);
+    // the keys are not changed
+    assert.deepEqual(keys[0], [1, -30]);
+});
+
+test('sort_order: empty cells are at the end, ascending and descending', () => {
+    // CULT-I of points outside of the curve is empty (null)
+    const keys = [[1, 0.3], [2, null], [3, 0.1], [4, null], [5, 0.9]];
+    assert.deepEqual(sort_order(keys, 1, false), [2, 0, 4, 1, 3]);
+    assert.deepEqual(sort_order(keys, 1, true), [4, 0, 2, 1, 3]);
+});
+
+test('sort_order: rows with the same value keep the order of the file', () => {
+    const keys = [[1, 2], [2, 1], [3, 2], [4, 1], [5, 2]];
+    assert.deepEqual(sort_order(keys, 1, false), [1, 3, 0, 2, 4]);
+    assert.deepEqual(sort_order(keys, 1, true), [0, 2, 4, 1, 3]);
+    // text (column of the hints): empty at the end
+    const hints_column = [['b'], [null], ['a'], ['b']];
+    assert.deepEqual(sort_order(hints_column, 0, false), [2, 0, 3, 1]);
+});
+
+test('sort_order: table of load points sorted by CULT-I', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    const loads = { x: [10, 900, 50, -900, 30], y: [-1000, -1000, -2000, -1000, -3000],
+                    per_metre: false, name: 'test.xlsx' };
+    const result = calculate(params, en1992, loads, true);
+    const t = table(result.points, false, true);
+    const column = t.head.indexOf('CULT-I');
+    for (const descending of [false, true]) {
+        const order = sort_order(t.keys, column, descending);
+        // every row once
+        assert.deepEqual(order.slice().sort(), [0, 1, 2, 3, 4]);
+        // the two points outside (2 and 4) are the last ones
+        assert.deepEqual(order.slice(3), [1, 3]);
+        const values = order.slice(0, 3).map(
+            i => /** @type {number} */ (t.keys[i][column]));
+        for (let i = 1; i < values.length; i++) {
+            assert.ok(descending ? values[i - 1] >= values[i] :
+                                   values[i - 1] <= values[i]);
+        }
+        // the number of the point stays with its row
+        for (const i of order) {
+            assert.equal(t.rows[i][0], String(i + 1));
+        }
+    }
+});
+
+test('hover text, table and core give the same CULT-I for every point', () => {
+    // points on a grid, inside and outside, with and without the minimum
+    // eccentricity
+    /** @type {number[]} */
+    const x = [];
+    /** @type {number[]} */
+    const y = [];
+    for (let i = -6; i <= 6; i++) {
+        for (let j = 0; j <= 8; j++) {
+            x.push(i * 40);
+            y.push(-j * 700 + 100);
+        }
+    }
+    const loads = { x: x, y: y, per_metre: false, name: 'grid.xlsx' };
+    for (const eccentricity of [false, true]) {
+        const { params } = check_inputs(raw({ eccentricity: eccentricity }),
+                                        en1992);
+        const result = calculate(params, en1992, loads, true);
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points, { e0: result.e0 });
+        const t = table(result.points, eccentricity, true);
+        const column = t.head.indexOf('CULT-I');
+        /** @type {Map<number, string>} */
+        const hover = new Map();
+        for (const trace of /** @type {any[]} */ (fig.data)) {
+            if (!/^Lastpunkte (innerhalb|ausserhalb)/.test(trace.name)) {
+                continue;
+            }
+            for (const text of trace.text) {
+                const number = Number(/^Punkt (\d+)</.exec(text)?.[1]);
+                const cult = /CULT-I: ([\d,]+)/.exec(text);
+                hover.set(number, cult ? cult[1] : 'ausserhalb');
+            }
+        }
+        assert.equal(hover.size, result.points.length);
+        result.points.forEach((p, i) => {
+            const details = cult_I_details(p.m_mod, p.n, result.values);
+            const core = (details === 'outside') ? 'ausserhalb' :
+                details.cult_I.toFixed(3).replace('.', ',');
+            assert.equal(t.rows[i][column], core, `point ${i + 1}, table`);
+            assert.equal(hover.get(i + 1), core, `point ${i + 1}, hover`);
+        });
+        assert.ok(result.points.some(p => p.inside));
+        assert.ok(result.points.some(p => !p.inside));
+    }
 });
