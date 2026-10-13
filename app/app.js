@@ -125,6 +125,36 @@ export const EXAMPLE = /** @type {Object<string, string>} */ ({
     f_ck: '30', f_yk: '500', eta_t: '0.85', gamma_d: '1.0',
 });
 
+// all inputs that are typed as text
+const TEXT_FIELDS = ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2', 'f_ck', 'f_yk',
+                     'gamma_c', 'gamma_s', 'gamma_d', 'alpha_cc', 'alpha_cc_pl'];
+// the inputs of the cross-section and of the materials
+const SECTION_FIELDS = ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk'];
+
+/**
+ * Are the cross-section and the materials exactly the example values?
+ * Then the result is marked as an example, not as values of a project.
+ * The numbers are compared, not the text ("0,35" is "0.35").
+ * @param {RawInputs} raw
+ * @returns {boolean}
+ */
+export function is_example(raw) {
+    const fields = /** @type {Object<string, any>} */ (raw);
+    return SECTION_FIELDS.every(
+        field => parse_number(fields[field]) === parse_number(EXAMPLE[field]));
+}
+
+/**
+ * Was anything entered in the fields that the example overwrites?
+ * Only then «Beispiel laden» offers to undo it.
+ * @param {RawInputs} raw
+ * @returns {boolean}
+ */
+export function has_inputs(raw) {
+    const fields = /** @type {Object<string, any>} */ (raw);
+    return Object.keys(EXAMPLE).some(field => fields[field].trim() !== '');
+}
+
 /**
  * The messages that are shown. An empty input is not an error as long as
  * the user has not been in the field: it is shown only after the field
@@ -655,6 +685,11 @@ export function start({ XLSX, Plotly }) {
     const table_box = element('table');
     const summary = element('summary');
 
+    const example_undo = element('example-undo');
+    const example_note = element('example-note');
+    // the input before «Beispiel laden», null: nothing to undo
+    /** @type {RawInputs | null} */
+    let before_example = null;
     // names of the inputs the user has left
     /** @type {Set<string>} */
     const touched = new Set();
@@ -808,6 +843,7 @@ export function start({ XLSX, Plotly }) {
 
         if (result === null) {
             // no result is shown for input that was rejected
+            example_note.hidden = true;
             Plotly.purge(diagram);
             diagram.replaceChildren();
             hints_list.replaceChildren();
@@ -815,8 +851,12 @@ export function start({ XLSX, Plotly }) {
             return;
         }
         const narrow = window.innerWidth < 700;
+        // example values are marked above the diagram and in the legend
+        const example = is_example(raw);
+        example_note.hidden = !example;
         const fig = figure(result.input_values, result.values, norm,
-                           result.points, { e0: result.e0, narrow: narrow });
+                           result.points,
+                           { e0: result.e0, narrow: narrow, example: example });
         draw(Plotly, diagram, fig);
         let lines = hints(norm, result, loads, raw.cult, raw.radial);
         if (narrow) {
@@ -896,7 +936,34 @@ export function start({ XLSX, Plotly }) {
         }
         update();
     });
+    // a change by the user ends the offer to undo the example
+    form.addEventListener('input', () => {
+        before_example = null;
+        example_undo.hidden = true;
+    });
+    element('undo').addEventListener('click', () => {
+        if (before_example === null) {
+            return;
+        }
+        // all fields as they were, also eta_t and gamma_d
+        const fields = /** @type {Object<string, any>} */ (before_example);
+        for (const field of TEXT_FIELDS) {
+            input(field).value = fields[field];
+        }
+        for (const radio of form.querySelectorAll('input[name="eta_t"]')) {
+            /** @type {HTMLInputElement} */ (radio).checked =
+                /** @type {HTMLInputElement} */ (radio).value === fields['eta_t'];
+        }
+        before_example = null;
+        example_undo.hidden = true;
+        update();
+    });
     element('example').addEventListener('click', () => {
+        // filled in at once, without a question; if there was input
+        // before, it can be brought back
+        const before = raw_inputs();
+        before_example = has_inputs(before) ? before : null;
+        example_undo.hidden = before_example === null;
         // the values are written into the fields, visible to the user
         for (const [field, value] of Object.entries(EXAMPLE)) {
             if (field === 'eta_t') {

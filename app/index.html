@@ -64,7 +64,9 @@
                 <legend>Querschnitt</legend>
                 <p class="small">Keine Vorgabewerte: alle Felder
                     ausfüllen.
-                    <button type="button" id="example">Beispiel laden</button></p>
+                    <button type="button" id="example">Beispiel laden</button>
+                    <span id="example-undo" hidden>Beispielwerte geladen –
+                        <button type="button" id="undo">Rückgängig</button></span></p>
                 <label>Höhe h [m]
                     <input type="text" inputmode="decimal" id="h_" value="" placeholder="z. B. 0,35"></label>
                 <label>Breite b [m]
@@ -141,6 +143,8 @@
 
         <section id="output">
             <div id="messages" class="error" hidden></div>
+            <p id="example-note" class="example-note" hidden>Beispielwerte,
+                nicht projektbezogen</p>
             <div id="diagram"></div>
             <ul id="hints" class="small"></ul>
         </section>
