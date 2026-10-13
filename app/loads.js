@@ -2,6 +2,7 @@
 /*
 Load points for the interaction diagram.
 */
+import { TextError } from './errors.js';
 
 /**
  * Forces of the cross-section from forces per metre (Plaxis 2D):
@@ -13,7 +14,7 @@ Load points for the interaction diagram.
  */
 export function section_forces(x, y, b_) {
     if (!Number.isFinite(b_) || b_ <= 0) {
-        throw new Error(`Die Breite b = ${b_} ist unzulässig (b > 0).`);
+        throw new TextError('loads.width', { b: b_ });
     }
     const m = x.map(value => value * b_);
     const n = y.map(value => value * b_);

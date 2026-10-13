@@ -5,16 +5,20 @@ Replaces legacy App.py (Dash). Runs in the browser only, no server.
 
 The functions in the first part do not touch the page, so they can be
 tested with node. start() connects them to index.html.
+
+All texts come from the table of the chosen language (i18n.js): the
+functions get a translator t, messages are keys with parameters.
 */
 import { int_diagram, min_eccentricity_moments } from './core.js';
 import { cult_I_details, cult_I_min_eccentricity } from './cult_i.js';
 import { radial_utilization, origin_inside } from './utilization.js';
 import { read } from './xls_read.js';
 import { load_points } from './loads.js';
-import { figure, draw, fmt, num, cult_text, min_cult_I, max_utilization }
-    from './draw.js';
+import { figure, draw, cult_text, min_cult_I, max_utilization } from './draw.js';
 import { en1992 } from './norms/en1992.js';
-import { sia262, eta_fc } from './norms/sia262.js';
+import { sia262, eta_fc, ETA_T_CHOICE } from './norms/sia262.js';
+import { TextError } from './errors.js';
+import { translator, default_language, LANGUAGES } from './i18n.js';
 
 /** @typedef {import('./core.js').InputParams} InputParams */
 /** @typedef {import('./core.js').InputValues} InputValues */
@@ -23,6 +27,8 @@ import { sia262, eta_fc } from './norms/sia262.js';
 /** @typedef {import('./draw.js').LoadPoint} LoadPoint */
 /** @typedef {import('./draw.js').PlotlyLibrary} PlotlyLibrary */
 /** @typedef {import('./xls_read.js').XlsxLibrary} XlsxLibrary */
+/** @typedef {import('./i18n.js').Translator} Translator */
+/** @typedef {import('./errors.js').TextMessage} TextMessage */
 
 /** The norms of the landing page, by the name in the address (#sia262). */
 export const NORMS = /** @type {Object<string, Norm>} */ ({
@@ -53,9 +59,12 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
  */
 
 /**
+ * A message of the check of the inputs: a key of the texts in i18n.js
+ * with its parameters, not a finished text.
  * @typedef {Object} Message
  * @property {string} field  name of the input, '' if it is not a single one
- * @property {string} text
+ * @property {string} key  key of the text
+ * @property {Object<string, any>} [params]
  * @property {boolean} [missing]  true: the input is empty (not wrong)
  */
 
@@ -68,26 +77,31 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
  * @property {string} name  name of the file
  */
 
-// names of the inputs for the messages
-const LABELS = /** @type {Object<string, string>} */ ({
-    h_: 'Höhe h',
-    b_: 'Breite b',
-    d_1: 'Achsabstand d_1',
-    d_2: 'Achsabstand d_2',
-    a_s1: 'Bewehrung a_s1',
-    a_s2: 'Bewehrung a_s2',
-    f_ck: 'f_ck',
-    f_yk: 'f_yk',
-    gamma_c: 'γ_c',
-    gamma_s: 'γ_s',
-    gamma_d: 'Lastfaktor γ_d',
-    alpha_cc: 'α_cc',
-    alpha_cc_pl: 'α_cc,pl',
+/**
+ * What is shown for the load points besides inside / outside.
+ * @typedef {Object} Shown
+ * @property {boolean} [cult]  CULT-I with its intermediate values
+ * @property {boolean} [radial]  the radial utilization
+ * @property {boolean} [eccentricity]  the moment with the minimum eccentricity
+ */
+
+// all inputs that are typed as text
+const TEXT_FIELDS = ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2', 'f_ck', 'f_yk',
+                     'gamma_c', 'gamma_s', 'gamma_d', 'alpha_cc', 'alpha_cc_pl'];
+// the inputs of the cross-section and of the materials
+const SECTION_FIELDS = ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk'];
+
+// numbers inside the fixed texts of the page: [number, digits]
+const TEXT_PARAMS = /** @type {Object<string, Object<string, any>>} */ ({
+    'label.alpha_cc': { low: [0.8, 1], high: [1.0, 1] },
+    'label.gamma_d': { one: [1.0, 1] },
+    'eta_t.help': { suggestion: [0.85, 2], impact: [1.2, 1] },
 });
 
 /**
  * Number from the text of an input. Decimal point or decimal comma,
- * as in legacy App.py (type_casting). Anything else is not a number.
+ * as in legacy App.py (type_casting), in every language of the
+ * interface. Anything else is not a number.
  * @param {string} text
  * @returns {number} NaN if the text is not a number
  */
@@ -116,20 +130,15 @@ export function rewrite_number(text, decimal) {
 }
 
 /**
- * Values of the button «Beispiel laden»: the placeholders of the inputs
- * as real values. They are written into the fields, so the user sees
- * what is calculated; nothing is calculated with placeholders.
+ * Values of the button «Beispiel laden» / «Load example»: the
+ * placeholders of the inputs as real values. They are written into the
+ * fields, so the user sees what is calculated; nothing is calculated
+ * with placeholders.
  */
 export const EXAMPLE = /** @type {Object<string, string>} */ ({
     h_: '0.35', b_: '1.0', a_s1: '2.58', d_1: '0.03', a_s2: '2.58', d_2: '0.03',
     f_ck: '30', f_yk: '500', eta_t: '0.85', gamma_d: '1.0',
 });
-
-// all inputs that are typed as text
-const TEXT_FIELDS = ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2', 'f_ck', 'f_yk',
-                     'gamma_c', 'gamma_s', 'gamma_d', 'alpha_cc', 'alpha_cc_pl'];
-// the inputs of the cross-section and of the materials
-const SECTION_FIELDS = ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk'];
 
 /**
  * Are the cross-section and the materials exactly the example values?
@@ -146,7 +155,7 @@ export function is_example(raw) {
 
 /**
  * Was anything entered in the fields that the example overwrites?
- * Only then «Beispiel laden» offers to undo it.
+ * Only then the example button offers to undo it.
  * @param {RawInputs} raw
  * @returns {boolean}
  */
@@ -167,6 +176,38 @@ export function has_inputs(raw) {
 export function shown_messages(messages, touched, has_file) {
     return messages.filter(message =>
         !message.missing || has_file || touched.has(message.field));
+}
+
+/**
+ * Text of a message in the chosen language.
+ * @param {Message | TextMessage} message
+ * @param {Translator} t
+ * @returns {string}
+ */
+export function message_text(message, t) {
+    const params = { ...message.params };
+    if ('field' in message && message.field !== '' && message.field !== 'eta_t') {
+        // name of the input, e.g. «Höhe h» / «Height h»
+        params['name'] = t('name.' + message.field);
+    }
+    if (params['message'] !== undefined) {
+        // a message of the norm inside the message
+        params['text'] = message_text(params['message'], t);
+    }
+    return t(message.key, params);
+}
+
+/**
+ * Text of an error in the chosen language.
+ * @param {unknown} error
+ * @param {Translator} t
+ * @returns {string}
+ */
+export function error_text(error, t) {
+    if (error instanceof TextError) {
+        return t(error.key, error.params);
+    }
+    return (error instanceof Error) ? error.message : String(error);
 }
 
 /**
@@ -192,19 +233,20 @@ export function check_inputs(raw, norm) {
         const text = /** @type {Object<string, any>} */ (raw)[field];
         if (text.trim() === '') {
             if (field === 'gamma_d') {
-                messages.push({ field: field, missing: true, text:
-                    'Lastfaktor γ_d fehlt (Pflichtfeld ohne Vorgabe; ' +
-                    '1,0, wenn Bemessungswerte importiert werden).' });
+                // required, no preset
+                messages.push({ field: field, missing: true,
+                                key: 'check.gamma_d_missing',
+                                params: { one: [1.0, 1] } });
             } else {
                 messages.push({ field: field, missing: true,
-                                text: `${LABELS[field]} fehlt.` });
+                                key: 'check.missing' });
             }
             continue;
         }
         const value = parse_number(text);
         if (Number.isNaN(value)) {
-            messages.push({ field: field, text:
-                `${LABELS[field]}: «${text.trim()}» ist keine Zahl.` });
+            messages.push({ field: field, key: 'check.not_a_number',
+                            params: { text: text.trim() } });
             continue;
         }
         numbers[field] = value;
@@ -214,22 +256,22 @@ export function check_inputs(raw, norm) {
     for (const field of ['h_', 'b_', 'f_ck', 'f_yk', 'gamma_c', 'gamma_s',
                          'gamma_d', 'alpha_cc_pl']) {
         if (field in numbers && numbers[field] <= 0) {
-            messages.push({ field: field, text:
-                `${LABELS[field]} = ${num(numbers[field])}: muss grösser als 0 sein.` });
+            messages.push({ field: field, key: 'check.positive',
+                            params: { value: numbers[field] } });
         }
     }
     for (const field of ['d_1', 'd_2', 'a_s1', 'a_s2']) {
         if (field in numbers && numbers[field] < 0) {
-            messages.push({ field: field, text:
-                `${LABELS[field]} = ${num(numbers[field])}: darf nicht negativ sein.` });
+            messages.push({ field: field, key: 'check.not_negative',
+                            params: { value: numbers[field] } });
         }
     }
     for (const field of ['d_1', 'd_2']) {
         if (field in numbers && 'h_' in numbers &&
             numbers[field] >= numbers['h_']) {
-            messages.push({ field: field, text:
-                `${LABELS[field]} = ${num(numbers[field])} m: muss kleiner ` +
-                `als die Höhe h = ${num(numbers['h_'])} m sein.` });
+            messages.push({ field: field, key: 'check.below_height',
+                            params: { value: numbers[field],
+                                      h: numbers['h_'] } });
         }
     }
 
@@ -239,8 +281,8 @@ export function check_inputs(raw, norm) {
     if (norm.inputs.includes('eta_t')) {
         if (raw.eta_t === '') {
             // no silent preset (SIA 262 4.2.1.3)
-            messages.push({ field: 'eta_t', missing: true, text:
-                'η_t fehlt: bitte 1,0 / 0,85 / 1,2 wählen (SIA 262 4.2.1.3).' });
+            messages.push({ field: 'eta_t', missing: true,
+                            key: 'check.eta_t_missing', params: ETA_T_CHOICE });
             norm_inputs_complete = false;
         } else {
             eta_t = parse_number(raw.eta_t);
@@ -259,8 +301,9 @@ export function check_inputs(raw, norm) {
             alpha_cc: numbers['alpha_cc'], alpha_cc_pl: numbers['alpha_cc_pl'],
             eta_t: eta_t,
         });
-        for (const text of norm_messages) {
-            messages.push({ field: '', text: `${norm.name}: ${text}` });
+        for (const message of norm_messages) {
+            messages.push({ field: '', key: 'check.norm',
+                            params: { norm: norm.name, message: message } });
         }
     }
 
@@ -302,15 +345,14 @@ export function check_inputs(raw, norm) {
  * @param {InputParams} params  checked input (check_inputs)
  * @param {Norm} norm
  * @param {Loads | null} loads  null: no file
- * @param {boolean} with_cult  calculate CULT-I
- * @param {boolean} [with_radial]  calculate the radial utilization
+ * @param {Shown} [shown]  calculate CULT-I, the radial utilization
  * @returns {Result}
  */
-export function calculate(params, norm, loads, with_cult, with_radial = false) {
+export function calculate(params, norm, loads, { cult = false, radial = false } = {}) {
     const result = int_diagram(params, norm);
     if (result === null) {
         // check_inputs rejects these cases before
-        throw new Error('Die Eingaben sind unzulässig.');
+        throw new TextError('app.inputs_invalid');
     }
     const [input_values, values] = result;
     const radial_defined = origin_inside(values);
@@ -322,7 +364,7 @@ export function calculate(params, norm, loads, with_cult, with_radial = false) {
      * @returns {number | null}
      */
     const utilization = (moments, n) => {
-        if (!with_radial || !radial_defined) {
+        if (!radial || !radial_defined) {
             return null;
         }
         /** @type {number | null} */
@@ -360,7 +402,7 @@ export function calculate(params, norm, loads, with_cult, with_radial = false) {
                     m_mod: check.m_governing,
                     modified: modified,
                     inside: check.details !== 'outside',
-                    cult: with_cult ? check.details : null,
+                    cult: cult ? check.details : null,
                     utilization: utilization(moments, n[i]),
                 });
             } else {
@@ -371,7 +413,7 @@ export function calculate(params, norm, loads, with_cult, with_radial = false) {
                     m_mod: m[i],
                     modified: false,
                     inside: details !== 'outside',
-                    cult: with_cult ? details : null,
+                    cult: cult ? details : null,
                     utilization: utilization([m[i]], n[i]),
                 });
             }
@@ -382,33 +424,39 @@ export function calculate(params, norm, loads, with_cult, with_radial = false) {
 }
 
 /**
+ * Value of a cell for sorting: a number, a text, or null for an empty
+ * cell (e.g. CULT-I of a point outside of the curve).
+ * @typedef {number | string | null} SortKey
+ */
+
+/**
  * Head and rows of the table of the load points, in kN and kNm.
  * The intermediate values of CULT-I are shown so that the index can be
  * checked by hand.
  * @param {LoadPoint[]} points
- * @param {boolean} with_eccentricity  show the modified moment
- * @param {boolean} with_cult  show CULT-I with its intermediate values
- * @param {boolean} [with_radial]  show the radial utilization
- * @returns {{head: string[], rows: string[][], marks: string[],
- *            keys: SortKey[][]}}
+ * @param {Translator} t
+ * @param {Shown} [shown]  which columns are shown
+ * @returns {{head: string[], head_keys: string[], rows: string[][],
+ *            marks: string[], keys: SortKey[][]}}
+ *     head_keys: keys of the texts of the head (the same in all languages);
  *     marks: '' / 'outside' / 'above' (CULT-I > 1) for each row;
  *     keys: the value behind each cell, for sorting (sort_order)
  */
-export function table(points, with_eccentricity, with_cult, with_radial = false) {
-    const head = ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]'];
-    if (with_eccentricity) {
-        head.push('M_Ed,mod [kNm]');
+export function table(points, t,
+                      { eccentricity = false, cult = false, radial = false } = {}) {
+    const head_keys = ['table.nr', 'table.n', 'table.m'];
+    if (eccentricity) {
+        head_keys.push('table.m_mod');
     }
-    if (with_radial) {
-        head.push('Ausnutzung radial');
+    if (radial) {
+        head_keys.push('table.utilization');
     }
-    if (with_cult) {
-        head.push('M_rel,i [kNm]', 'N_rel,i [kN]',
-                  'M_rel,max [kNm]', 'N_rel,max [kN]',
-                  'M_rel,i / M_rel,max', 'N_rel,i / N_rel,max',
-                  'CULT-I');
+    if (cult) {
+        head_keys.push('table.m_rel_i', 'table.n_rel_i',
+                       'table.m_rel_max', 'table.n_rel_max',
+                       'table.m_ratio', 'table.n_ratio', 'table.cult');
     }
-    head.push('Hinweis');
+    head_keys.push('table.hint');
     /** @type {string[][]} */
     const rows = [];
     /** @type {SortKey[][]} */
@@ -418,45 +466,45 @@ export function table(points, with_eccentricity, with_cult, with_radial = false)
     points.forEach((p, i) => {
         // the number of the point is the row of the file, it stays with
         // the point when the table is sorted
-        const row = [String(i + 1), fmt(p.n * 1000, 1), fmt(p.m * 1000, 2)];
+        const row = [String(i + 1), t.fmt(p.n * 1000, 1), t.fmt(p.m * 1000, 2)];
         /** @type {SortKey[]} */
         const key = [i + 1, p.n * 1000, p.m * 1000];
-        if (with_eccentricity) {
-            row.push(fmt(p.m_mod * 1000, 2));
+        if (eccentricity) {
+            row.push(t.fmt(p.m_mod * 1000, 2));
             key.push(p.m_mod * 1000);
         }
         // inside or outside of the curve is always shown
         let mark = '';
         let hint = '';
         if (!p.inside) {
-            hint = 'Punkt ausserhalb der Kurve';
+            hint = t('table.outside');
             mark = 'outside';
         }
-        if (with_radial) {
+        if (radial) {
             // above 1 outside of the curve, not capped
-            row.push((p.utilization === null) ? '' : fmt(p.utilization, 3));
+            row.push((p.utilization === null) ? '' : t.fmt(p.utilization, 3));
             key.push(p.utilization);
         }
-        if (with_cult) {
+        if (cult) {
             if (p.cult === null || p.cult === 'outside') {
                 row.push('', '', '', '', '', '',
-                         (p.cult === null) ? '' : cult_text(p.cult));
+                         (p.cult === null) ? '' : cult_text(p.cult, t));
                 // no values: null is sorted to the end
                 key.push(null, null, null, null, null, null, null);
             } else {
                 if (p.cult.cult_I > 1) {
                     // the value is shown as it is, not capped
-                    hint = 'CULT-I > 1, siehe Hinweis';
+                    hint = t('table.above');
                     mark = 'above';
                 }
                 const m_ratio = p.cult.m_rel_i / p.cult.m_rel_max;
                 const n_ratio = p.cult.n_rel_i / p.cult.n_rel_max;
-                row.push(fmt(p.cult.m_rel_i * 1000, 2),
-                         fmt(p.cult.n_rel_i * 1000, 1),
-                         fmt(p.cult.m_rel_max * 1000, 2),
-                         fmt(p.cult.n_rel_max * 1000, 1),
-                         fmt(m_ratio, 3), fmt(n_ratio, 3),
-                         cult_text(p.cult));
+                row.push(t.fmt(p.cult.m_rel_i * 1000, 2),
+                         t.fmt(p.cult.n_rel_i * 1000, 1),
+                         t.fmt(p.cult.m_rel_max * 1000, 2),
+                         t.fmt(p.cult.n_rel_max * 1000, 1),
+                         t.fmt(m_ratio, 3), t.fmt(n_ratio, 3),
+                         cult_text(p.cult, t));
                 key.push(p.cult.m_rel_i * 1000, p.cult.n_rel_i * 1000,
                          p.cult.m_rel_max * 1000, p.cult.n_rel_max * 1000,
                          m_ratio, n_ratio, p.cult.cult_I);
@@ -468,14 +516,9 @@ export function table(points, with_eccentricity, with_cult, with_radial = false)
         keys.push(key);
         marks.push(mark);
     });
-    return { head: head, rows: rows, marks: marks, keys: keys };
+    return { head: head_keys.map(head_key => t(head_key)), head_keys: head_keys,
+             rows: rows, marks: marks, keys: keys };
 }
-
-/**
- * Value of a cell for sorting: a number, a text, or null for an empty
- * cell (e.g. CULT-I of a point outside of the curve).
- * @typedef {number | string | null} SortKey
- */
 
 /**
  * Order of the rows of the table when it is sorted by one column.
@@ -502,7 +545,7 @@ export function sort_order(keys, column, descending) {
         if (typeof key_a === 'number' && typeof key_b === 'number') {
             difference = key_a - key_b;
         } else {
-            difference = String(key_a).localeCompare(String(key_b), 'de');
+            difference = String(key_a).localeCompare(String(key_b));
         }
         if (difference === 0) {
             return a - b;
@@ -517,34 +560,35 @@ export function sort_order(keys, column, descending) {
  * the curve, the largest radial utilization and the smallest CULT-I of
  * the points inside.
  * @param {LoadPoint[]} points
- * @param {boolean} with_cult
- * @param {boolean} [with_radial]
+ * @param {Translator} t
+ * @param {Shown} [shown]
  * @returns {string}
  */
-export function summary_text(points, with_cult, with_radial = false) {
+export function summary_text(points, t, { cult = false, radial = false } = {}) {
     if (points.length === 0) {
         return '';
     }
     const inside = points.filter(p => p.inside);
     const outside = points.length - inside.length;
-    let text = `${points.length} Lastpunkte (Bemessungswerte): ` +
-        `${inside.length} innerhalb, ${outside} ausserhalb der Kurve.`;
-    if (with_radial) {
+    const parts = [t('summary.points', { total: points.length,
+                                         inside: inside.length,
+                                         outside: outside })];
+    if (radial) {
         const largest_inside = max_utilization(inside);
         if (largest_inside !== null) {
-            text += ' Grösste Ausnutzung radial der Punkte innerhalb: ' +
-                `${fmt(largest_inside, 3)}.`;
+            parts.push(t('summary.max_inside',
+                         { value: t.fmt(largest_inside, 3) }));
         }
         const largest = max_utilization(points);
         if (outside > 0 && largest !== null) {
-            text += ` Grösste Ausnutzung radial aller Punkte: ${fmt(largest, 3)}.`;
+            parts.push(t('summary.max_all', { value: t.fmt(largest, 3) }));
         }
     }
     const smallest = min_cult_I(inside);
-    if (with_cult && typeof smallest === 'number') {
-        text += ` Kleinstes CULT-I der Punkte innerhalb: ${fmt(smallest, 3)}.`;
+    if (cult && typeof smallest === 'number') {
+        parts.push(t('summary.min_cult', { value: t.fmt(smallest, 3) }));
     }
-    return text;
+    return parts.join(' ');
 }
 
 /**
@@ -552,97 +596,69 @@ export function summary_text(points, with_cult, with_radial = false) {
  * @param {Norm} norm
  * @param {Result} result
  * @param {Loads | null} loads
- * @param {boolean} with_cult
- * @param {boolean} [with_radial]
+ * @param {Translator} t
+ * @param {Shown} [shown]
  * @returns {string[]}
  */
-export function hints(norm, result, loads, with_cult, with_radial = false) {
+export function hints(norm, result, loads, t, { cult = false, radial = false } = {}) {
     const i_val = result.input_values;
     /** @type {string[]} */
     const list = [];
+    const f_cd = t.fmt(i_val['f_cd'], 2);
 
     if (norm === sia262) {
-        list.push(`f_cd = η_fc · η_t · f_ck / γ_c = ` +
-                  `${fmt(eta_fc(i_val['f_ck']), 3)} · ${num(i_val['eta_t'])} · ` +
-                  `${num(i_val['f_ck'])} / ${num(i_val['gamma_c'])}` +
-                  (i_val['plain'] ? ' · 0,8' : '') +
-                  ` = ${fmt(i_val['f_cd'], 2)} N/mm²`);
+        list.push(t(i_val['plain'] ? 'hint.f_cd_sia_plain' : 'hint.f_cd_sia', {
+            eta_fc: t.fmt(eta_fc(i_val['f_ck']), 3), eta_t: i_val['eta_t'],
+            f_ck: i_val['f_ck'], gamma_c: i_val['gamma_c'],
+            factor: [0.8, 1], f_cd: f_cd }));
     } else {
-        const alpha = i_val['plain'] ? i_val['alpha_cc_pl'] : i_val['alpha_cc'];
-        list.push(`f_cd = ${i_val['plain'] ? 'α_cc,pl' : 'α_cc'} · f_ck / γ_c = ` +
-                  `${num(alpha)} · ${num(i_val['f_ck'])} / ${num(i_val['gamma_c'])}` +
-                  ` = ${fmt(i_val['f_cd'], 2)} N/mm²`);
+        list.push(t(i_val['plain'] ? 'hint.f_cd_en_plain' : 'hint.f_cd_en', {
+            alpha: i_val['plain'] ? i_val['alpha_cc_pl'] : i_val['alpha_cc'],
+            f_ck: i_val['f_ck'], gamma_c: i_val['gamma_c'], f_cd: f_cd }));
     }
     if (i_val['plain']) {
         // decision D7
-        if (norm === sia262) {
-            list.push('Unbewehrter Querschnitt: f_cd abgemindert ' +
-                      '(SIA 197 7.6.2.2).');
-        } else {
-            list.push('Unbewehrter Querschnitt: f_cd abgemindert; ' +
-                      'Begrenzung der Lastausmitte (EN 12.6.2) wird ' +
-                      'nicht geprüft.');
-        }
+        list.push(t((norm === sia262) ? 'hint.plain_sia' : 'hint.plain_en'));
     }
     for (const note of norm.notes) {
-        list.push(note + '.');
+        list.push(t(note));
     }
     if (norm === sia262) {
         // decision D5
-        list.push('Drehpunkt C der Dehnungsebenen: konservative Annahme ' +
-                  'analog EN 1992-1-1 6.1 (5), nicht aus SIA 262.');
+        list.push(t('hint.pivot_c'));
     } else {
-        list.push('Querschnittswiderstand ohne Effekte 2. Ordnung.');
+        list.push(t('norm.note.second_order'));
     }
     // decision D3
-    list.push(`Betonstahl ideal plastisch, Stahldehnung auf ` +
-              `${fmt(norm.eps_s_max * 1000, 0)} ‰ begrenzt ` +
-              '(zulässig, nicht normbegründet).');
+    list.push(t('hint.steel', { limit: t.fmt(norm.eps_s_max * 1000, 0) }));
     if (result.e0 !== null) {
-        list.push(`Mindestausmitte e0 = max(h/30; 20 mm) = ` +
-                  `${fmt(result.e0 * 1000, 1)} mm (EN 1992-1-1 6.1 (4)): ` +
-                  'Lastpunkte mit Druck werden mit M_Ed,mod = ' +
-                  'max(|M_Ed|; e0·|N_Ed|) geprüft, bei M_Ed = 0 beide ' +
-                  'Vorzeichen. Die Widerstandskurve bleibt unverändert.');
+        list.push(t('hint.min_eccentricity',
+                    { e0: t.fmt(result.e0 * 1000, 1) }));
     }
 
     if (loads !== null) {
-        list.push(`Lastpunkte aus «${loads.name}»: ${loads.x.length} Punkte, ` +
-                  `mit γ_d = ${num(i_val['gamma_d'])} multipliziert.`);
+        list.push(t('hint.loads', { name: loads.name, count: loads.x.length,
+                                    gamma_d: i_val['gamma_d'] }));
         if (loads.per_metre) {
-            list.push('Plaxis-Tabelle mit Werten pro Meter [kN/m, kNm/m]: ' +
-                      `mit der Breite b = ${num(i_val['b'])} m multipliziert.`);
+            list.push(t('hint.per_metre', { b: i_val['b'] }));
         }
-        list.push('Vorzeichen: N negativ = Druck. Das Vorzeichen von M wird ' +
-                  'wie in der Datei übernommen, nichts wird umgekehrt. ' +
-                  'Positives M: Zug auf der Seite von a_s1 (Achsabstand d_1); ' +
-                  'negatives M: Zug auf der Seite von a_s2. Bei Plaxis hängt ' +
-                  'das Vorzeichen von M von der lokalen Achse der Platte ab; ' +
-                  'bei a_s1 ≠ a_s2 oder d_1 ≠ d_2 die Zuordnung prüfen.');
-        if (with_radial && !result.radial_defined) {
+        list.push(t('hint.sign'));
+        if (radial && !result.radial_defined) {
             // the origin is not inside of the curve, it ends there
-            list.push('Ausnutzung radial bei unbewehrtem Querschnitt ' +
-                      'nicht definiert.');
-        } else if (with_radial) {
-            list.push('Ausnutzung radial = |S_d| / |R_d| auf dem Strahl vom ' +
-                      'Ursprung durch den Lastpunkt: 1 = Punkt auf der Kurve, ' +
-                      'über 1 = ausserhalb (nicht gekappt).' +
-                      ((result.e0 !== null) ?
-                          ' Mit Mindestausmitte am geprüften Punkt (M_Ed,mod).' :
-                          ''));
-            list.push('Ausnutzung radial setzt proportionale Laststeigerung ' +
-                      'von N und M voraus.');
+            list.push(t('hint.radial_undefined'));
+        } else if (radial) {
+            list.push(t('hint.radial'));
+            if (result.e0 !== null) {
+                list.push(t('hint.radial_min_eccentricity'));
+            }
+            list.push(t('hint.radial_assumption'));
         }
-        if (with_cult) {
-            list.push('CULT-I ist ein Reserve-Index, keine Ausnutzung: ' +
-                      '0 = Punkt auf der Kurve (Grenzzustand), grosse Werte = ' +
-                      'grosse Reserve; 1 entspricht dem Zentrum der Kurve ' +
-                      '(M = 0, Normalkraft des grössten Moments).');
+        if (cult) {
+            list.push(t('hint.cult'));
             const above = result.points.some(
                 p => p.cult !== null && p.cult !== 'outside' && p.cult.cult_I > 1);
             if (above) {
-                list.push('CULT-I > 1 bei mindestens einem Punkt: N_rel,i ist ' +
-                          'grösser als N_rel,max. Der Wert wird nicht gekappt.');
+                list.push(t('hint.cult_above'));
             }
         }
     }
@@ -684,19 +700,40 @@ export function start({ XLSX, Plotly }) {
     const hints_list = element('hints');
     const table_box = element('table');
     const summary = element('summary');
-
     const example_undo = element('example-undo');
     const example_note = element('example-note');
-    // the input before «Beispiel laden», null: nothing to undo
+
+    // the language is kept for the next visit
+    const STORAGE_KEY = 'interaction-diagram.language';
+    /**
+     * @returns {string}
+     */
+    function first_language() {
+        try {
+            const stored = window.localStorage.getItem(STORAGE_KEY);
+            if (stored !== null && LANGUAGES.includes(stored)) {
+                return stored;
+            }
+        } catch (error) {
+            // no storage (e.g. private mode): the language of the browser
+        }
+        return default_language(window.navigator.language);
+    }
+    let t = translator(first_language());
+
+    // the input before the example was loaded, null: nothing to undo
     /** @type {RawInputs | null} */
     let before_example = null;
     // names of the inputs the user has left
     /** @type {Set<string>} */
     const touched = new Set();
-    // sorting of the table: head of the column and direction
-    let sort = { head: 'Nr.', descending: false };
+    // sorting of the table: key of the head of the column and direction
+    let sort = { head_key: 'table.nr', descending: false };
     /** @type {Loads | null} */
     let loads = null;
+    // what the line below the file input says: a message or an error
+    /** @type {{message: TextMessage | null, error: unknown} | null} */
+    let file_state = null;
     /** @type {Norm | null} */
     let norm = null;
 
@@ -741,24 +778,35 @@ export function start({ XLSX, Plotly }) {
         }));
     }
 
+    /** The line below the file input, in the chosen language. */
+    function show_file_state() {
+        if (file_state === null) {
+            file_message.textContent = '';
+            file_message.className = '';
+        } else if (file_state.message !== null) {
+            file_message.textContent = message_text(file_state.message, t);
+            file_message.className = '';
+        } else {
+            file_message.textContent = error_text(file_state.error, t);
+            file_message.className = 'error';
+        }
+    }
+
     /**
      * @param {LoadPoint[]} points
-     * @param {boolean} with_eccentricity
-     * @param {boolean} with_cult
-     * @param {boolean} with_radial
+     * @param {Shown} shown
      */
-    function show_table(points, with_eccentricity, with_cult, with_radial) {
-        summary.textContent = summary_text(points, with_cult, with_radial);
+    function show_table(points, shown) {
+        summary.textContent = summary_text(points, t, shown);
         if (points.length === 0) {
             table_box.replaceChildren();
             return;
         }
-        const { head, rows, marks, keys } = table(points, with_eccentricity,
-                                                  with_cult, with_radial);
+        const { head, head_keys, rows, marks, keys } = table(points, t, shown);
         // the column of the last click, if the table still has it
-        let column = head.indexOf(sort.head);
+        let column = head_keys.indexOf(sort.head_key);
         if (column === -1) {
-            sort = { head: 'Nr.', descending: false };
+            sort = { head_key: 'table.nr', descending: false };
             column = 0;
         }
         const table_element = document.createElement('table');
@@ -768,7 +816,7 @@ export function start({ XLSX, Plotly }) {
             // a button, so that the head can be used with the keyboard
             const button = document.createElement('button');
             button.type = 'button';
-            button.title = 'Sortieren';
+            button.title = t('table.sort');
             let arrow = '';
             if (i === column) {
                 arrow = sort.descending ? ' ▼' : ' ▲';
@@ -778,9 +826,10 @@ export function start({ XLSX, Plotly }) {
             button.textContent = text + arrow;
             button.addEventListener('click', () => {
                 // first click ascending, second click descending
-                sort = { head: text,
-                         descending: sort.head === text && !sort.descending };
-                show_table(points, with_eccentricity, with_cult, with_radial);
+                sort = { head_key: head_keys[i],
+                         descending: sort.head_key === head_keys[i] &&
+                                     !sort.descending };
+                show_table(points, shown);
             });
             cell.append(button);
             head_row.append(cell);
@@ -821,20 +870,19 @@ export function start({ XLSX, Plotly }) {
             marked.classList.add('invalid');
         }
 
-        let texts = shown.map(message => message.text);
+        let texts = shown.map(message => message_text(message, t));
         let is_error = true;
         /** @type {Result | null} */
         let result = null;
         if (messages.length === 0) {
             try {
-                result = calculate(params, norm, loads, raw.cult, raw.radial);
+                result = calculate(params, norm, loads, raw);
             } catch (error) {
-                texts = [(error instanceof Error) ? error.message : String(error)];
+                texts = [error_text(error, t)];
             }
         } else if (shown.length === 0) {
             // values are still missing, nothing is wrong: a neutral hint
-            texts = ['Querschnitt und Baustoffe eingeben, dann erscheint ' +
-                     'das Diagramm.'];
+            texts = [t('messages.enter_values')];
             is_error = false;
         }
         fill(messages_box, texts, 'p');
@@ -847,7 +895,7 @@ export function start({ XLSX, Plotly }) {
             Plotly.purge(diagram);
             diagram.replaceChildren();
             hints_list.replaceChildren();
-            show_table([], false, false, false);
+            show_table([], {});
             return;
         }
         const narrow = window.innerWidth < 700;
@@ -855,18 +903,21 @@ export function start({ XLSX, Plotly }) {
         const example = is_example(raw);
         example_note.hidden = !example;
         const fig = figure(result.input_values, result.values, norm,
-                           result.points,
+                           result.points, t,
                            { e0: result.e0, narrow: narrow, example: example });
         draw(Plotly, diagram, fig);
-        let lines = hints(norm, result, loads, raw.cult, raw.radial);
+        let lines = hints(norm, result, loads, t, raw);
         if (narrow) {
             // small screen: the legend is shown as text
             lines = fig.legend_lines.concat(lines);
         }
         fill(hints_list, lines, 'li');
-        // no column for a value that is not defined for this curve
-        show_table(result.points, result.e0 !== null, raw.cult,
-                   raw.radial && result.radial_defined);
+        show_table(result.points, {
+            eccentricity: result.e0 !== null,
+            cult: raw.cult,
+            // no column for a value that is not defined for this curve
+            radial: raw.radial && result.radial_defined,
+        });
     }
 
     /**
@@ -876,24 +927,59 @@ export function start({ XLSX, Plotly }) {
     async function read_file(file) {
         try {
             if (!/\.xlsx$/i.test(file.name)) {
-                throw new Error(`«${file.name}»: Es werden nur Excel-Dateien ` +
-                                '(.xlsx) gelesen.');
+                throw new TextError('file.only_xlsx', { name: file.name });
             }
             const data = await file.arrayBuffer();
             const [x, y, per_metre] = read(data, XLSX);
             loads = { x: x, y: y, per_metre: per_metre, name: file.name };
-            file_message.textContent = `«${file.name}» gelesen: ` +
-                `${x.length} Lastpunkte` +
-                (per_metre ? ' (Plaxis, Werte pro Meter).' : '.');
-            file_message.className = '';
+            file_state = { error: null, message: {
+                key: per_metre ? 'file.read_plaxis' : 'file.read',
+                params: { name: file.name, count: x.length } } };
         } catch (error) {
             // a file that cannot be read replaces the old load points:
             // otherwise the diagram would show points of another file
             loads = null;
-            file_message.textContent = (error instanceof Error) ?
-                error.message : String(error);
-            file_message.className = 'error';
+            file_state = { error: error, message: null };
         }
+        show_file_state();
+        update();
+    }
+
+    /**
+     * All texts of the page in the chosen language. The values of the
+     * inputs stay; only their decimal sign follows the language.
+     */
+    function apply_language() {
+        document.documentElement.lang = t.lang;
+        document.title = t('title');
+        for (const node of document.querySelectorAll('[data-i18n]')) {
+            const key = /** @type {HTMLElement} */ (node).dataset.i18n || '';
+            node.textContent = t(key, TEXT_PARAMS[key]);
+        }
+        // placeholders: the example values
+        for (const node of document.querySelectorAll('[data-example]')) {
+            const field = /** @type {HTMLInputElement} */ (node);
+            field.placeholder = t('placeholder', { value: rewrite_number(
+                field.dataset.example || '', t.decimal) });
+        }
+        // numbers in fixed places, e.g. the options of eta_t
+        for (const node of document.querySelectorAll('[data-number]')) {
+            node.textContent = rewrite_number(
+                /** @type {HTMLElement} */ (node).dataset.number || '', t.decimal);
+        }
+        for (const node of document.querySelectorAll('[data-language]')) {
+            const button = /** @type {HTMLButtonElement} */ (node);
+            const active = button.dataset.language === t.lang;
+            button.classList.toggle('active', active);
+            button.setAttribute('aria-pressed', String(active));
+        }
+        for (const field of TEXT_FIELDS) {
+            input(field).value = rewrite_number(input(field).value, t.decimal);
+        }
+        if (norm !== null) {
+            element('norm-name').textContent = t(norm.label);
+        }
+        show_file_state();
         update();
     }
 
@@ -906,7 +992,7 @@ export function start({ XLSX, Plotly }) {
         if (norm === null) {
             return;
         }
-        element('norm-name').textContent = norm.label;
+        element('norm-name').textContent = t(norm.label);
         // inputs of the other norm are hidden, their values are kept
         for (const group of form.querySelectorAll('[data-norm]')) {
             /** @type {HTMLElement} */ (group).hidden =
@@ -915,10 +1001,26 @@ export function start({ XLSX, Plotly }) {
         // presets of the norm, only where nothing is entered yet
         for (const [field, value] of Object.entries(norm.defaults)) {
             if (input(field).value.trim() === '') {
-                input(field).value = num(value);
+                input(field).value = t.num(value);
             }
         }
         update();
+    }
+
+    for (const node of document.querySelectorAll('[data-language]')) {
+        node.addEventListener('click', () => {
+            const lang = /** @type {HTMLElement} */ (node).dataset.language || '';
+            if (!LANGUAGES.includes(lang)) {
+                return;
+            }
+            t = translator(lang);
+            try {
+                window.localStorage.setItem(STORAGE_KEY, lang);
+            } catch (error) {
+                // no storage: the choice holds for this visit only
+            }
+            apply_language();
+        });
     }
 
     form.addEventListener('input', update);
@@ -931,8 +1033,8 @@ export function start({ XLSX, Plotly }) {
         // from now on an empty field is an error
         touched.add((target.type === 'radio') ? target.name : target.id);
         if (target.type === 'text') {
-            // decimal sign of the interface; the value does not change
-            target.value = rewrite_number(target.value, ',');
+            // decimal sign of the language; the value does not change
+            target.value = rewrite_number(target.value, t.decimal);
         }
         update();
     });
@@ -973,12 +1075,14 @@ export function start({ XLSX, Plotly }) {
                     radio.checked = true;
                 }
             } else {
-                input(field).value = rewrite_number(value, ',');
+                input(field).value = rewrite_number(value, t.decimal);
             }
         }
         update();
     });
 
+    // the button stands for the hidden file input of the browser
+    element('choose-file').addEventListener('click', () => file_input.click());
     file_input.addEventListener('change', () => {
         if (file_input.files !== null && file_input.files.length > 0) {
             read_file(file_input.files[0]);
@@ -1006,10 +1110,12 @@ export function start({ XLSX, Plotly }) {
     });
     element('remove-file').addEventListener('click', () => {
         loads = null;
-        file_message.textContent = '';
+        file_state = null;
+        show_file_state();
         update();
     });
 
     window.addEventListener('hashchange', route);
     route();
+    apply_language();
 }

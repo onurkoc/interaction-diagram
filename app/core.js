@@ -7,6 +7,7 @@ see NOTES.md (sections 4 and 5).
 */
 import { en1992 } from './norms/en1992.js';
 import { strain_planes } from './strain_planes.js';
+import { TextError } from './errors.js';
 
 /** @typedef {import('./norms/en1992.js').Norm} Norm */
 
@@ -273,7 +274,9 @@ export function int_diagram({
     // input outside the limits of the norm is rejected, not corrected
     const messages = norm.check(norm_params);
     if (messages.length > 0) {
-        throw new Error(`${norm.name}: ${messages.join(' ')}`);
+        // the first message, as a key of the text with its parameters
+        throw new TextError(messages[0].key,
+                            { ...messages[0].params, norm: norm.name });
     }
     let f_cd;
     if (a_s1 === 0 && a_s2 === 0) {
@@ -288,8 +291,7 @@ export function int_diagram({
 
     if (norm.min_eccentricity === null && eccentricity) {
         // no silent correction of the input
-        throw new Error(`${norm.name}: keine Mindestausmitte, ` +
-                        'die Option ist in diesem Modus nicht zulässig.');
+        throw new TextError('core.no_min_eccentricity', { norm: norm.name });
     }
 
     if (d <= 0 || h_ - d_2 <= 0 || a_s1 < 0 || a_s2 < 0 || b_ <= 0 ||

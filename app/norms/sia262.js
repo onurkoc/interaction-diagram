@@ -5,10 +5,11 @@ Clause numbers refer to SIA 262:2025 unless stated otherwise.
 Decisions D1..D7 and findings: see NOTES.md.
 */
 
-import { comma } from './en1992.js';
+import { TextError } from '../errors.js';
 
 /** @typedef {import('./en1992.js').Norm} Norm */
 /** @typedef {import('./en1992.js').NormParams} NormParams */
+/** @typedef {import('../errors.js').TextMessage} TextMessage */
 
 /**
  * eta_fc, 4.2.1.2, Gl. (26)
@@ -22,6 +23,10 @@ export function eta_fc(f_ck) {
 // eta_t, 4.2.1.3: 1.0 / 0.85 / 1.2 (impact)
 export const eta_t_values = [1.0, 0.85, 1.2];
 
+// the three values as parameters of the messages, in the order of the
+// interface; [number, digits] so that 1.0 keeps its decimal
+export const ETA_T_CHOICE = { a: [0.85, 2], b: [1.0, 1], c: [1.2, 1] };
+
 // The user has to choose eta_t, there is no silent preset.
 // Suggestion for shotcrete, which is usually loaded early.
 export const eta_t_suggestion = 0.85;
@@ -29,7 +34,7 @@ export const eta_t_suggestion = 0.85;
 /** @type {Norm} */
 export const sia262 = {
     name: 'SIA 262:2025',
-    label: 'SIA 262:2025',
+    label: 'norm.sia262.label',
 
     // 4.2.1.5, Figur 12 and 4.2.1.6, Gl. (27).
     // The app uses k_sigma = 2 (parabola), a deliberate simplification
@@ -54,8 +59,8 @@ export const sia262 = {
     // 2.4.2.3, Gl. (2)
     f_cd(p) {
         if (p.eta_t === undefined) {
-            throw new Error('SIA 262: eta_t fehlt (4.2.1.3), ' +
-                            'bitte 1,0 / 0,85 / 1,2 wählen.');
+            // 4.2.1.3
+            throw new TextError('norm.eta_t_missing', ETA_T_CHOICE);
         }
         return eta_fc(p.f_ck) * p.eta_t * p.f_ck / p.gamma_c;
     },
@@ -82,22 +87,20 @@ export const sia262 = {
                      step: 0.0003, steps_c: 10 },
 
     check(p) {
+        /** @type {TextMessage[]} */
         const messages = [];
         if (p.f_ck > this.f_ck_max) {
             // decision D4
-            messages.push(`f_ck = ${comma(p.f_ck)} N/mm²: nur bis ` +
-                          `${this.f_ck_max} N/mm² (C50/60) zulässig.`);
+            messages.push({ key: 'norm.f_ck_max',
+                            params: { f_ck: p.f_ck, f_ck_max: this.f_ck_max } });
         }
         if (p.eta_t === undefined || !eta_t_values.includes(p.eta_t)) {
             // 4.2.1.3
-            messages.push(`eta_t = ${comma(p.eta_t)}: zulässig ist ` +
-                          '1,0 / 0,85 / 1,2.');
+            messages.push({ key: 'norm.eta_t',
+                            params: { eta_t: p.eta_t, ...ETA_T_CHOICE } });
         }
         return messages;
     },
 
-    notes: [
-        'Querschnittswiderstand ohne Effekte 2. Ordnung',
-        'Betonlinie: Gl. (27) mit k_σ = 2 (Parabel), Vereinfachung',
-    ],
+    notes: ['norm.note.second_order', 'norm.note.k_sigma'],
 };

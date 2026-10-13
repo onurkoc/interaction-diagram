@@ -3,17 +3,26 @@
 Interface: the functions of app.js and draw.js that do not touch the page.
 The tests check what follows from the rules of the interface
 (NOTES.md, decisions), not calculated reference values.
+
+Messages are checked by their key, not by their text. Where a text is
+needed, it is taken from the table of the language (i18n.js), and the
+test runs for every language.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
          summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE,
-         is_example, has_inputs }
+         is_example, has_inputs, message_text, error_text }
     from '../app/app.js';
-import { figure, min_cult_I, EXAMPLE_TEXT } from '../app/draw.js';
+import { figure, min_cult_I, max_utilization } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { sia262 } from '../app/norms/sia262.js';
+import { translator, LANGUAGES } from '../app/i18n.js';
+import { TextError } from '../app/errors.js';
+
+const de = translator('de');
+const en = translator('en');
 
 /**
  * Complete input as typed by the user.
@@ -39,6 +48,41 @@ function fields(messages) {
     return messages.map(message => message.field);
 }
 
+/**
+ * @param {import('../app/app.js').Message[]} messages
+ * @returns {string[]}
+ */
+function keys_of(messages) {
+    return messages.map(message => message.key);
+}
+
+/**
+ * Load points for the tests.
+ * @param {number[]} x  moments [kNm]
+ * @param {number[]} y  normal forces [kN]
+ * @param {boolean} [per_metre]
+ * @returns {import('../app/app.js').Loads}
+ */
+function loads_of(x, y, per_metre = false) {
+    return { x: x, y: y, per_metre: per_metre, name: 'test.xlsx' };
+}
+
+// three points for the tests of the table: inside, outside, CULT-I > 1
+/** @type {import('../app/draw.js').LoadPoint[]} */
+const POINTS = [
+    { m: 0.1, n: -1.5, m_mod: 0.1, modified: false, inside: true,
+      utilization: 0.4,
+      cult: { cult_I: 0.5, m_rel_i: 0.2, n_rel_i: 1.25,
+              m_rel_max: 0.4, n_rel_max: 2.5 } },
+    { m: 0.9, n: -1, m_mod: 0.9, modified: false, inside: false,
+      utilization: 2.5, cult: 'outside' },
+    // not capped: a value above 1 is shown and marked
+    { m: 0, n: -3, m_mod: 0.06, modified: true, inside: true,
+      utilization: 0.75,
+      cult: { cult_I: 1.2, m_rel_i: 0.3, n_rel_i: 3,
+              m_rel_max: 0.4, n_rel_max: 2.5 } },
+];
+
 test('app: the norms of the landing page', () => {
     assert.deepEqual(Object.keys(NORMS), ['sia262', 'en1992']);
     assert.equal(NORMS['sia262'], sia262);
@@ -58,49 +102,66 @@ test('parse_number: decimal point or decimal comma, nothing else', () => {
     }
 });
 
+test('rewrite_number: only the decimal sign changes, the value stays', () => {
+    assert.equal(rewrite_number('1.35', ','), '1,35');
+    assert.equal(rewrite_number('1,35', '.'), '1.35');
+    assert.equal(rewrite_number('1,35', ','), '1,35');
+    // the digits stay as typed, nothing is rounded or shortened
+    assert.equal(rewrite_number('0.350', ','), '0,350');
+    assert.equal(rewrite_number('1.0', ','), '1,0');
+    assert.equal(rewrite_number(' 2.58 ', ','), '2,58');
+    assert.equal(rewrite_number('-0.5', ','), '-0,5');
+    assert.equal(rewrite_number('30', ','), '30');
+    // reading and rewriting give the same number, in every language
+    for (const text of ['1.35', '1,35', '0.03', '0,030', '2,58', '500', '-1.5',
+                        '.25', '7.', '0.1', '123456.789']) {
+        for (const lang of LANGUAGES) {
+            const decimal = translator(lang).decimal;
+            const written = rewrite_number(text, decimal);
+            assert.equal(parse_number(written), parse_number(text),
+                         `«${text}» -> «${written}»`);
+            assert.equal(written.includes(decimal === ',' ? '.' : ','), false);
+        }
+    }
+    // text that is not a number is not touched
+    for (const text of ['', ' ', 'abc', '1.2.3', '1,2,3', '1e3', '5 m']) {
+        assert.equal(rewrite_number(text, ','), text);
+    }
+});
+
 test('check_inputs: complete input gives the parameters', () => {
-    const en = check_inputs(raw(), en1992);
-    assert.deepEqual(en.messages, []);
-    assert.deepEqual(en.params, {
+    const result_en = check_inputs(raw(), en1992);
+    assert.deepEqual(result_en.messages, []);
+    assert.deepEqual(result_en.params, {
         h_: 0.30, b_: 1.0, d_1: 0.05, d_2: 0.05, a_s1: 5.24, a_s2: 5.24,
         f_ck: 30, f_yk: 500, gamma_c: 1.5, gamma_s: 1.15, gamma_d: 1.35,
         eccentricity: false, alpha_cc: 1.0, alpha_cc_pl: 0.8,
     });
 
-    const sia = check_inputs(raw(), sia262);
-    assert.deepEqual(sia.messages, []);
-    assert.equal(sia.params.eta_t, 0.85);
+    const result_sia = check_inputs(raw(), sia262);
+    assert.deepEqual(result_sia.messages, []);
+    assert.equal(result_sia.params.eta_t, 0.85);
     // inputs of the other norm are not passed on
-    assert.equal('alpha_cc' in sia.params, false);
-    assert.equal('eta_t' in en.params, false);
+    assert.equal('alpha_cc' in result_sia.params, false);
+    assert.equal('eta_t' in result_en.params, false);
 });
 
-test('check_inputs: the cross-section has no presets, an empty field is rejected', () => {
-    // the same for the materials f_ck and f_yk
+test('check_inputs: no presets, an empty field is a missing value', () => {
     for (const field of ['h_', 'b_', 'a_s1', 'a_s2', 'd_1', 'd_2',
                          'f_ck', 'f_yk']) {
         const { messages } = check_inputs(raw({ [field]: '' }), en1992);
         assert.deepEqual(fields(messages), [field]);
-        assert.match(messages[0].text, / fehlt\.$/);
+        assert.equal(messages[0].key, 'check.missing');
+        assert.equal(messages[0].missing, true);
     }
-    // nothing entered at all: one message for each of them
-    const empty = check_inputs(raw({ h_: '', b_: ' ', a_s1: '', a_s2: '',
-                                     d_1: '', d_2: '' }), sia262);
-    assert.deepEqual(fields(empty.messages),
-                     ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2']);
-});
-
-test('check_inputs: the load factor has no preset', () => {
-    const { messages } = check_inputs(raw({ gamma_d: '' }), en1992);
-    assert.deepEqual(fields(messages), ['gamma_d']);
-    assert.match(messages[0].text, /Lastfaktor γ_d fehlt/);
-});
-
-test('check_inputs: eta_t has to be chosen (SIA)', () => {
-    const { messages } = check_inputs(raw({ eta_t: '' }), sia262);
-    assert.deepEqual(fields(messages), ['eta_t']);
-    assert.match(messages[0].text, /η_t fehlt/);
-    // not needed in the EN mode
+    // the load factor has no preset either
+    const gamma_d = check_inputs(raw({ gamma_d: '' }), en1992).messages;
+    assert.deepEqual(keys_of(gamma_d), ['check.gamma_d_missing']);
+    assert.equal(gamma_d[0].field, 'gamma_d');
+    // eta_t has to be chosen (SIA), it is not needed in the EN mode
+    const eta_t = check_inputs(raw({ eta_t: '' }), sia262).messages;
+    assert.deepEqual(keys_of(eta_t), ['check.eta_t_missing']);
+    assert.equal(eta_t[0].field, 'eta_t');
     assert.deepEqual(check_inputs(raw({ eta_t: '' }), en1992).messages, []);
 });
 
@@ -113,572 +174,84 @@ test('check_inputs: the minimum eccentricity exists in the EN mode only', () => 
 });
 
 test('check_inputs: invalid input is rejected, not corrected', () => {
-    assert.deepEqual(fields(check_inputs(raw({ h_: 'abc' }), en1992).messages),
-                     ['h_']);
-    assert.deepEqual(fields(check_inputs(raw({ b_: '0' }), en1992).messages),
-                     ['b_']);
-    assert.deepEqual(fields(check_inputs(raw({ a_s1: '-1' }), en1992).messages),
-                     ['a_s1']);
-    assert.deepEqual(fields(check_inputs(raw({ gamma_c: '0' }), en1992).messages),
-                     ['gamma_c']);
+    /**
+     * @param {Object} changes
+     * @param {import('../app/norms/en1992.js').Norm} [norm]
+     * @returns {import('../app/app.js').Message}
+     */
+    const only = (changes, norm = en1992) => {
+        const { messages } = check_inputs(raw(changes), norm);
+        assert.equal(messages.length, 1);
+        return messages[0];
+    };
+    assert.deepEqual(only({ h_: 'abc' }),
+                     { field: 'h_', key: 'check.not_a_number',
+                       params: { text: 'abc' } });
+    assert.deepEqual(only({ b_: '0' }),
+                     { field: 'b_', key: 'check.positive', params: { value: 0 } });
+    assert.deepEqual(only({ a_s1: '-1' }),
+                     { field: 'a_s1', key: 'check.not_negative',
+                       params: { value: -1 } });
+    assert.equal(only({ gamma_c: '0' }).key, 'check.positive');
     // axis distance not smaller than the height
-    assert.deepEqual(fields(check_inputs(raw({ d_2: '0.30' }), en1992).messages),
-                     ['d_2']);
+    assert.deepEqual(only({ d_2: '0.4' }),
+                     { field: 'd_2', key: 'check.below_height',
+                       params: { value: 0.4, h: 0.3 } });
 
     // limits of the norm: f_ck above 50 (D4), alpha_cc outside 0.8 to 1.0
     for (const norm of [en1992, sia262]) {
-        const { messages } = check_inputs(raw({ f_ck: '55' }), norm);
-        assert.equal(messages.length, 1);
-        assert.match(messages[0].text, /f_ck = 55/);
+        const message = only({ f_ck: '55' }, norm);
+        assert.equal(message.key, 'check.norm');
+        assert.equal(/** @type {any} */ (message.params).norm, norm.name);
+        assert.equal(/** @type {any} */ (message.params).message.key,
+                     'norm.f_ck_max');
     }
     for (const alpha_cc of ['0.79', '1.01']) {
-        const { messages } = check_inputs(raw({ alpha_cc: alpha_cc }), en1992);
-        assert.equal(messages.length, 1);
-        // the message shows the number with a decimal comma
-        assert.match(messages[0].text,
-                     new RegExp(`alpha_cc = ${alpha_cc.replace('.', ',')}:`));
+        const inner = /** @type {any} */ (only({ alpha_cc: alpha_cc }).params)
+            .message;
+        assert.equal(inner.key, 'norm.alpha_cc');
+        assert.equal(inner.params.alpha_cc, Number(alpha_cc));
     }
-    assert.match(check_inputs(raw({ d_1: '0.4' }), en1992).messages[0].text,
-                 /Achsabstand d_1 = 0,4 m: muss kleiner als die Höhe h = 0,3 m sein/);
     assert.deepEqual(check_inputs(raw({ alpha_cc: '0,8' }), en1992).messages, []);
     // alpha_cc is not checked in the SIA mode
     assert.deepEqual(check_inputs(raw({ alpha_cc: '5' }), sia262).messages, []);
 });
 
-test('calculate: load points are gamma_d * value / 1000', () => {
-    const { params } = check_inputs(raw(), en1992);
-    const loads = { x: [100, -50], y: [-1000, -2000], per_metre: false,
-                    name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, true);
-    assert.equal(result.e0, null);
-    assert.equal(result.points.length, 2);
-    assert.equal(result.points[0].m, 1.35 * 100 / 1000);
-    assert.equal(result.points[0].n, 1.35 * -1000 / 1000);
-    for (const p of result.points) {
-        assert.equal(p.m_mod, p.m);
-        assert.equal(p.modified, false);
-        assert.equal(p.inside, true);
-        assert.deepEqual(p.cult, cult_I_details(p.m, p.n, result.values));
-    }
-    // without a file: only the curves
-    assert.deepEqual(calculate(params, en1992, null, true).points, []);
-    // CULT-I switched off
-    assert.equal(calculate(params, en1992, loads, false).points[0].cult, null);
-});
-
-test('calculate: values per metre are multiplied by the width', () => {
-    const { params } = check_inputs(raw({ b_: '0.5' }), en1992);
-    const loads = { x: [100], y: [-1000], per_metre: true, name: 'plaxis.xlsx' };
-    const [point] = calculate(params, en1992, loads, false).points;
-    assert.equal(point.m, 1.35 * (100 * 0.5) / 1000);
-    assert.equal(point.n, 1.35 * (-1000 * 0.5) / 1000);
-});
-
-test('calculate: minimum eccentricity moves the load points (EN, D1)', () => {
-    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
-                                    en1992);
-    // e0 = max(h / 30; 20 mm) = 0.02 m for h = 0.30 m
-    const loads = { x: [10, 100, 0], y: [-1000, -1000, -1000],
-                    per_metre: false, name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, true);
-    assert.equal(result.e0, 0.02);
-    const [small, large, zero] = result.points;
-    // |M| < e0 * |N| = 0.02: moved
-    assert.equal(small.modified, true);
-    assert.equal(small.m_mod, 0.02 * 1);
-    assert.equal(small.m, 0.01);
-    // |M| > e0 * |N|: unchanged
-    assert.equal(large.modified, false);
-    assert.equal(large.m_mod, 0.1);
-    // M = 0: one of the two signs governs
-    assert.equal(zero.modified, true);
-    assert.equal(Math.abs(zero.m_mod), 0.02);
-    // CULT-I belongs to the modified point
-    assert.deepEqual(small.cult, cult_I_details(0.02, -1, result.values));
-});
-
-test('table: values in kN and kNm with the intermediate values of CULT-I', () => {
-    /** @type {import('../app/draw.js').LoadPoint[]} */
-    const points = [
-        { m: 0.1, n: -1.5, m_mod: 0.1, modified: false, inside: true,
-          utilization: 0.4,
-          cult: { cult_I: 0.5, m_rel_i: 0.2, n_rel_i: 1.25,
-                  m_rel_max: 0.4, n_rel_max: 2.5 } },
-        { m: 0.9, n: -1, m_mod: 0.9, modified: false, inside: false,
-          utilization: 2.5, cult: 'outside' },
-        // not capped: a value above 1 is shown and marked
-        { m: 0, n: -3, m_mod: 0.06, modified: true, inside: true,
-          utilization: 0.75,
-          cult: { cult_I: 1.2, m_rel_i: 0.3, n_rel_i: 3,
-                  m_rel_max: 0.4, n_rel_max: 2.5 } },
+test('message_text: every message has a text in every language', () => {
+    const cases = [
+        check_inputs(raw({ h_: '', gamma_d: '', eta_t: '' }), sia262).messages,
+        check_inputs(raw({ h_: 'abc', b_: '0', a_s1: '-1', d_2: '0.4' }),
+                     en1992).messages,
+        check_inputs(raw({ f_ck: '55', alpha_cc: '0.7' }), en1992).messages,
+        check_inputs(raw({ f_ck: '55', eta_t: '0.9' }), sia262).messages,
     ];
-    const full = table(points, true, true);
-    assert.deepEqual(full.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]',
-        'M_Ed,mod [kNm]', 'M_rel,i [kNm]', 'N_rel,i [kN]',
-        'M_rel,max [kNm]', 'N_rel,max [kN]',
-        'M_rel,i / M_rel,max', 'N_rel,i / N_rel,max', 'CULT-I', 'Hinweis']);
-    // decimal comma in all output
-    assert.deepEqual(full.rows[0], ['1', '-1500,0', '100,00', '100,00',
-        '200,00', '1250,0', '400,00', '2500,0',
-        // the two ratios with three decimals: 0.2 / 0.4 and 1.25 / 2.5
-        '0,500', '0,500', '0,500', '']);
-    assert.deepEqual(full.rows[1], ['2', '-1000,0', '900,00', '900,00',
-        '', '', '', '', '', '', 'ausserhalb', 'Punkt ausserhalb der Kurve']);
-    assert.equal(full.rows[2][3], '60,00');
-    assert.deepEqual(full.rows[2].slice(8, 11), ['0,750', '1,200', '1,200']);
-    // the values behind the cells, for sorting: numbers, not text
-    assert.deepEqual(full.keys[0], [1, -1500, 100, 100, 200, 1250, 400, 2500,
-                                    0.5, 0.5, 0.5, null]);
-    assert.deepEqual(full.keys[1].slice(4), [null, null, null, null, null,
-        null, null, 'Punkt ausserhalb der Kurve']);
-    for (const key of full.keys) {
-        assert.equal(key.length, full.head.length);
-    }
-    assert.deepEqual(full.marks, ['', 'outside', 'above']);
-    for (const row of full.rows) {
-        assert.equal(row.length, full.head.length);
-    }
-
-    const short = table(points, false, false);
-    // nothing switched on: inside / outside is still shown
-    assert.deepEqual(short.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]', 'Hinweis']);
-    assert.deepEqual(short.rows[0], ['1', '-1500,0', '100,00', '']);
-    assert.deepEqual(short.rows[1], ['2', '-1000,0', '900,00',
-                                     'Punkt ausserhalb der Kurve']);
-    assert.deepEqual(short.marks, ['', 'outside', '']);
-
-    // radial utilization only: one column, above 1 outside, not capped
-    const radial = table(points, false, false, true);
-    assert.deepEqual(radial.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]',
-                                   'Ausnutzung radial', 'Hinweis']);
-    assert.deepEqual(radial.rows.map(row => row[3]), ['0,400', '2,500', '0,750']);
-    assert.deepEqual(radial.keys.map(key => key[3]), [0.4, 2.5, 0.75]);
-    // sorted by the utilization, descending: the point outside first
-    assert.deepEqual(sort_order(radial.keys, 3, true), [1, 2, 0]);
-    // both: the utilization stands before the columns of CULT-I
-    const both = table(points, true, true, true);
-    assert.equal(both.head.indexOf('Ausnutzung radial'), 4);
-    assert.equal(both.head.indexOf('M_rel,i [kNm]'), 5);
-    assert.equal(both.head.length, full.head.length + 1);
-    for (const row of both.rows) {
-        assert.equal(row.length, both.head.length);
-    }
-
-    // summary: number of points outside and the smallest CULT-I inside
-    assert.equal(summary_text(points, true),
-        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der ' +
-        'Kurve. Kleinstes CULT-I der Punkte innerhalb: 0,500.');
-    assert.equal(summary_text(points, false),
-        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der Kurve.');
-    assert.equal(summary_text([points[1]], true),
-        '1 Lastpunkte (Bemessungswerte): 0 innerhalb, 1 ausserhalb der Kurve.');
-    assert.equal(summary_text([], true), '');
-    // with the radial utilization: the largest value inside, and of all
-    // points if there are points outside
-    assert.equal(summary_text(points, false, true),
-        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der ' +
-        'Kurve. Grösste Ausnutzung radial der Punkte innerhalb: 0,750. ' +
-        'Grösste Ausnutzung radial aller Punkte: 2,500.');
-    assert.equal(summary_text([points[0], points[2]], true, true),
-        '2 Lastpunkte (Bemessungswerte): 2 innerhalb, 0 ausserhalb der ' +
-        'Kurve. Grösste Ausnutzung radial der Punkte innerhalb: 0,750. ' +
-        'Kleinstes CULT-I der Punkte innerhalb: 0,500.');
-
-    assert.equal(min_cult_I(points), 'outside');
-    assert.equal(min_cult_I([points[0], points[2]]), 0.5);
-    assert.equal(min_cult_I([]), null);
-});
-
-test('figure: the legend shows the f_cd that was used (N6)', () => {
-    const { params } = check_inputs(raw({ alpha_cc: '0.85' }), en1992);
-    const result = calculate(params, en1992, null, true);
-    const fig = figure(result.input_values, result.values, en1992, []);
-    // f_cd = 0.85 * 30 / 1.5 = 17
-    assert.equal(fig.data.length, 2);
-    assert.match(/** @type {any} */ (fig.data[0]).name, /f_cd = 17,00 N\/mm²/);
-    assert.match(/** @type {any} */ (fig.data[0]).name,
-                 /Beton ohne Bewehrung \(Vergleich\)/);
-    assert.match(/** @type {any} */ (fig.data[1]).name, /Mit Bewehrung/);
-    // the curve with reinforcement governs: solid and stronger than the
-    // comparison line
-    const [comparison, governing] = /** @type {any[]} */ (fig.data);
-    assert.equal(governing.line.dash, 'solid');
-    assert.equal(comparison.line.dash, 'dash');
-    assert.ok(governing.line.width > comparison.line.width);
-    assert.notEqual(governing.line.color, comparison.line.color);
-    assert.equal(/** @type {any} */ (fig.layout).title.text, en1992.label);
-    // decimal comma on the axes, too
-    assert.equal(/** @type {any} */ (fig.layout).separators[0], ',');
-    assert.match(/** @type {any} */ (fig.data[0]).name, /h = 0,3 m<br>b = 1 m<br>d_1 = 0,05 m/);
-    // closed curve: both sides
-    assert.equal(/** @type {any} */ (fig.data[1]).x.length,
-                 result.values['Moment Reinf'].length +
-                 result.values['Moment Reinf Neg'].length);
-});
-
-test('figure: plain concrete section, one curve with the reduced f_cd (D7)', () => {
-    const { params } = check_inputs(raw({ a_s1: '0', a_s2: '0' }), en1992);
-    const result = calculate(params, en1992, null, true);
-    const fig = figure(result.input_values, result.values, en1992, []);
-    assert.equal(fig.data.length, 1);
-    // f_cd = alpha_cc,pl * 30 / 1.5 = 16
-    assert.match(/** @type {any} */ (fig.data[0]).name,
-                 /Beton unbewehrt<br>f_cd = 16,00 N\/mm² \(abgemindert\)/);
-    // the only curve governs: solid
-    assert.equal(/** @type {any} */ (fig.data[0]).line.dash, 'solid');
-    assert.ok(hints(en1992, result, null, true).some(
-        hint => hint.includes('EN 12.6.2')));
-});
-
-test('figure: load points, ray of the minimum eccentricity (D1)', () => {
-    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
-                                    en1992);
-    const loads = { x: [10, 100], y: [-1000, -1000], per_metre: false,
-                    name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, true);
-    const fig = figure(result.input_values, result.values, en1992,
-                       result.points, { e0: result.e0 });
-    const names = fig.data.map(trace => /** @type {any} */ (trace).name);
-    assert.equal(names.length, 5);
-    assert.match(names[2], /Mindestausmitte M = ±e0·N<br>e0 = 0,020 m/);
-    assert.match(names[3],
-        /^Lastpunkte innerhalb: 2 von 2<br>Bemessungswerte, γ_d = 1<br>min\. CULT-I: \d,\d{3}$/);
-    assert.equal(names[4], 'Lastpunkte mit Mindestausmitte');
-    // the original points stay, only the moved point is drawn again
-    // the diagram is in kNm and kN
-    assert.deepEqual(/** @type {any} */ (fig.data[3]).x, [10, 100]);
-    assert.deepEqual(/** @type {any} */ (fig.data[3]).y, [-1000, -1000]);
-    assert.deepEqual(/** @type {any} */ (fig.data[4]).x, [20]);
-    // the ray: M = e0 * N at the largest compression force
-    const ray = /** @type {any} */ (fig.data[2]);
-    assert.ok(Math.abs(ray.x[0] - -0.02 * ray.y[0]) < 1e-9);
-    assert.deepEqual([ray.x[1], ray.y[1]], [0, 0]);
-    // units of the axes and of the hover texts
-    const layout = /** @type {any} */ (fig.layout);
-    assert.match(layout.xaxis.title.text, /\[kNm\]/);
-    assert.match(layout.yaxis.title.text, /\[kN\]/);
-    assert.match(/** @type {any} */ (fig.data[3]).text[0],
-                 /^Punkt 1<br>M: 10,00 kNm<br>N: -1000,0 kN<br>M mit Mindestausmitte: 20,00 kNm/);
-    assert.match(/** @type {any} */ (fig.data[1]).text[0], /^M: .* kNm<br>N: .* kN$/);
-    // the curve itself: 1000 times the values of the calculation
-    assert.equal(/** @type {any} */ (fig.data[1]).y[0],
-                 result.values['Normal Force Reinf'][0] * 1000);
-});
-
-test('hints: norm, simplifications and the handling of the file', () => {
-    const { params } = check_inputs(raw({ b_: '0.5' }), sia262);
-    const loads = { x: [100], y: [-1000], per_metre: true, name: 'plaxis.xlsx' };
-    const result = calculate(params, sia262, loads, true);
-    const text = hints(sia262, result, loads, true).join('\n');
-    assert.match(text, /k_σ = 2/);
-    assert.match(text, /ohne Effekte 2\. Ordnung/);
-    assert.match(text, /nicht aus SIA 262/);
-    assert.match(text, /12 ‰/);
-    assert.match(text, /= 1,000 · 0,85 · 30 \/ 1,5 = 17,00 N\/mm²/);
-    assert.match(text, /mit γ_d = 1,35 multipliziert/);
-    // no number with a decimal point in the hints
-    assert.doesNotMatch(text.replace(/[\d)] \. |2\. Ordnung|6\.1 \(5\)|z\. B\./g, ''),
-                        /\d\.\d/);
-    assert.match(text, /mit der Breite b = 0,5 m multipliziert/);
-    assert.match(text, /Positives M: Zug auf der Seite von a_s1/);
-    assert.match(text, /Reserve-Index, keine Ausnutzung/);
-    // the legend of the SIA mode names the norm
-    const fig = figure(result.input_values, result.values, sia262, result.points);
-    assert.equal(/** @type {any} */ (fig.layout).title.text, 'SIA 262:2025');
-
-    // EN mode: no hint of the SIA mode
-    const en = check_inputs(raw(), en1992);
-    const en_text = hints(en1992, calculate(en.params, en1992, null, true),
-                          null, true).join('\n');
-    assert.match(en_text, /ohne Effekte 2\. Ordnung/);
-    assert.doesNotMatch(en_text, /k_σ/);
-    assert.doesNotMatch(en_text, /CULT-I/);
-});
-
-test('figure: small screen, the legend is given as text', () => {
-    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
-                                    en1992);
-    const loads = { x: [10, 100], y: [-1000, -1000], per_metre: false,
-                    name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, true);
-    const wide = figure(result.input_values, result.values, en1992,
-                        result.points, { e0: result.e0 });
-    const narrow = figure(result.input_values, result.values, en1992,
-                          result.points, { e0: result.e0, narrow: true });
-    assert.equal(/** @type {any} */ (wide.layout).showlegend, undefined);
-    assert.equal(/** @type {any} */ (narrow.layout).showlegend, false);
-    assert.equal(/** @type {any} */ (narrow.layout).title.text, 'EN 1992-1-1');
-    // one line for each trace, with its colour
-    assert.equal(narrow.legend_lines.length, narrow.data.length);
-    assert.match(narrow.legend_lines[0],
-                 /^grau gestrichelt, dünn: Beton ohne Bewehrung \(Vergleich\), f_cd = 20,00 N\/mm²/);
-    assert.match(narrow.legend_lines[1], /^blau durchgezogen: Mit Bewehrung, a_s1 = 5,24 cm²/);
-    assert.match(narrow.legend_lines[2], /^orange strichpunktiert: Mindestausmitte/);
-    assert.match(narrow.legend_lines[3], /^grüne Punkte: Lastpunkte innerhalb: 2 von 2, /);
-    assert.match(narrow.legend_lines[4], /^hohle Punkte: Lastpunkte mit Mindestausmitte$/);
-});
-
-test('figure: load points inside and outside are two traces with their numbers', () => {
-    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
-    // the second and the fourth point are far outside of the curve
-    const loads = { x: [10, 900, 50, -900], y: [-1000, -1000, -2000, -1000],
-                    per_metre: false, name: 'test.xlsx' };
-    for (const with_cult of [true, false]) {
-        const result = calculate(params, en1992, loads, with_cult);
-        assert.deepEqual(result.points.map(p => p.inside),
-                         [true, false, true, false]);
-        const fig = figure(result.input_values, result.values, en1992,
-                           result.points);
-        const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
-        assert.equal(fig.data.length, 4);
-        assert.match(inside.name, /^Lastpunkte innerhalb: 2 von 4<br>/);
-        assert.match(outside.name, /^Lastpunkte ausserhalb der Kurve: 2 von 4<br>/);
-        assert.deepEqual(inside.x, [10, 50]);
-        assert.deepEqual(outside.x, [900, -900]);
-        assert.notEqual(inside.marker.color, outside.marker.color);
-        // the smallest CULT-I is the one of the points inside
-        assert.equal(/min\. CULT-I/.test(inside.name), with_cult);
-        assert.doesNotMatch(outside.name, /CULT-I/);
-        // the numbers of the points are the ones of the table
-        assert.match(outside.text[1], /^Punkt 4<br>/);
-        assert.match(outside.text[1], /ausserhalb der Kurve/);
-    }
-
-    // all points inside: no trace for points outside
-    const all_inside = calculate(params, en1992,
-        { x: [10], y: [-1000], per_metre: false, name: 'test.xlsx' }, true);
-    const names = figure(all_inside.input_values, all_inside.values, en1992,
-                         all_inside.points).data.map(
-        trace => /** @type {any} */ (trace).name);
-    assert.equal(names.length, 3);
-    assert.match(names[2], /^Lastpunkte innerhalb: 1 von 1<br>/);
-});
-test('sort_order: numbers are sorted as numbers, both directions', () => {
-    // as text, "-1000" < "-200" < "-30" < "5" < "50" would not be this order
-    const keys = [[1, -30], [2, 50], [3, -1000], [4, 5], [5, -200]];
-    assert.deepEqual(sort_order(keys, 1, false), [2, 4, 0, 3, 1]);
-    assert.deepEqual(sort_order(keys, 1, true), [1, 3, 0, 4, 2]);
-    // by the number of the point: the order of the file
-    assert.deepEqual(sort_order(keys, 0, false), [0, 1, 2, 3, 4]);
-    assert.deepEqual(sort_order(keys, 0, true), [4, 3, 2, 1, 0]);
-    // the keys are not changed
-    assert.deepEqual(keys[0], [1, -30]);
-});
-
-test('sort_order: empty cells are at the end, ascending and descending', () => {
-    // CULT-I of points outside of the curve is empty (null)
-    const keys = [[1, 0.3], [2, null], [3, 0.1], [4, null], [5, 0.9]];
-    assert.deepEqual(sort_order(keys, 1, false), [2, 0, 4, 1, 3]);
-    assert.deepEqual(sort_order(keys, 1, true), [4, 0, 2, 1, 3]);
-});
-
-test('sort_order: rows with the same value keep the order of the file', () => {
-    const keys = [[1, 2], [2, 1], [3, 2], [4, 1], [5, 2]];
-    assert.deepEqual(sort_order(keys, 1, false), [1, 3, 0, 2, 4]);
-    assert.deepEqual(sort_order(keys, 1, true), [0, 2, 4, 1, 3]);
-    // text (column of the hints): empty at the end
-    const hints_column = [['b'], [null], ['a'], ['b']];
-    assert.deepEqual(sort_order(hints_column, 0, false), [2, 0, 3, 1]);
-});
-
-test('sort_order: table of load points sorted by CULT-I', () => {
-    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
-    const loads = { x: [10, 900, 50, -900, 30], y: [-1000, -1000, -2000, -1000, -3000],
-                    per_metre: false, name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, true);
-    const t = table(result.points, false, true);
-    const column = t.head.indexOf('CULT-I');
-    for (const descending of [false, true]) {
-        const order = sort_order(t.keys, column, descending);
-        // every row once
-        assert.deepEqual(order.slice().sort(), [0, 1, 2, 3, 4]);
-        // the two points outside (2 and 4) are the last ones
-        assert.deepEqual(order.slice(3), [1, 3]);
-        const values = order.slice(0, 3).map(
-            i => /** @type {number} */ (t.keys[i][column]));
-        for (let i = 1; i < values.length; i++) {
-            assert.ok(descending ? values[i - 1] >= values[i] :
-                                   values[i - 1] <= values[i]);
-        }
-        // the number of the point stays with its row
-        for (const i of order) {
-            assert.equal(t.rows[i][0], String(i + 1));
-        }
-    }
-});
-
-test('hover text, table and core give the same CULT-I for every point', () => {
-    // points on a grid, inside and outside, with and without the minimum
-    // eccentricity
-    /** @type {number[]} */
-    const x = [];
-    /** @type {number[]} */
-    const y = [];
-    for (let i = -6; i <= 6; i++) {
-        for (let j = 0; j <= 8; j++) {
-            x.push(i * 40);
-            y.push(-j * 700 + 100);
-        }
-    }
-    const loads = { x: x, y: y, per_metre: false, name: 'grid.xlsx' };
-    for (const eccentricity of [false, true]) {
-        const { params } = check_inputs(raw({ eccentricity: eccentricity }),
-                                        en1992);
-        const result = calculate(params, en1992, loads, true);
-        const fig = figure(result.input_values, result.values, en1992,
-                           result.points, { e0: result.e0 });
-        const t = table(result.points, eccentricity, true);
-        const column = t.head.indexOf('CULT-I');
-        /** @type {Map<number, string>} */
-        const hover = new Map();
-        for (const trace of /** @type {any[]} */ (fig.data)) {
-            if (!/^Lastpunkte (innerhalb|ausserhalb)/.test(trace.name)) {
-                continue;
-            }
-            for (const text of trace.text) {
-                const number = Number(/^Punkt (\d+)</.exec(text)?.[1]);
-                const cult = /CULT-I: ([\d,]+)/.exec(text);
-                hover.set(number, cult ? cult[1] : 'ausserhalb');
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        for (const messages of cases) {
+            assert.ok(messages.length > 0);
+            for (const message of messages) {
+                const text = message_text(message, t);
+                // all parameters are filled in
+                assert.doesNotMatch(text, /[{}]|undefined|\[object/, text);
             }
         }
-        assert.equal(hover.size, result.points.length);
-        result.points.forEach((p, i) => {
-            const details = cult_I_details(p.m_mod, p.n, result.values);
-            const core = (details === 'outside') ? 'ausserhalb' :
-                details.cult_I.toFixed(3).replace('.', ',');
-            assert.equal(t.rows[i][column], core, `point ${i + 1}, table`);
-            assert.equal(hover.get(i + 1), core, `point ${i + 1}, hover`);
-        });
-        assert.ok(result.points.some(p => p.inside));
-        assert.ok(result.points.some(p => !p.inside));
     }
-});
-test('radial utilization and CULT-I can be switched on and off', () => {
-    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
-    // the second point is far outside of the curve
-    const loads = { x: [10, 900, 50], y: [-1000, -1000, -2000],
-                    per_metre: false, name: 'test.xlsx' };
-    for (const [with_cult, with_radial] of [[true, true], [true, false],
-                                            [false, true], [false, false]]) {
-        const result = calculate(params, en1992, loads, with_cult, with_radial);
-        assert.equal(result.radial_defined, true);
-        // inside / outside is always determined
-        assert.deepEqual(result.points.map(p => p.inside), [true, false, true]);
-        for (const p of result.points) {
-            assert.equal(p.cult !== null, with_cult);
-            assert.equal(p.utilization !== null, with_radial);
-            if (p.utilization !== null) {
-                // below 1 inside, above 1 outside
-                assert.equal(p.utilization < 1, p.inside);
-            }
-        }
-        const fig = figure(result.input_values, result.values, en1992,
-                           result.points);
-        const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
-        assert.match(inside.name, /^Lastpunkte innerhalb: 2 von 3<br>/);
-        assert.match(outside.name, /^Lastpunkte ausserhalb der Kurve: 1 von 3<br>/);
-        // legend and hover text name only what is switched on
-        assert.equal(/max\. Ausnutzung radial: \d,\d{3}/.test(inside.name), with_radial);
-        assert.equal(/max\. Ausnutzung radial: \d+,\d{3}/.test(outside.name), with_radial);
-        assert.equal(/min\. CULT-I/.test(inside.name), with_cult);
-        assert.equal(/Ausnutzung radial: 0,\d{3}/.test(inside.text[0]), with_radial);
-        assert.equal(/CULT-I: /.test(inside.text[0]), with_cult);
-        assert.match(outside.text[0], /ausserhalb der Kurve/);
+    // numbers follow the decimal sign of the language
+    const [message] = check_inputs(raw({ d_2: '0.4' }), en1992).messages;
+    assert.match(message_text(message, de), /= 0,4 m.* h = 0,3 m/);
+    assert.match(message_text(message, en), /= 0\.4 m.* h = 0\.3 m/);
+    // the name of the input is the one of the language
+    assert.ok(message_text(message, de).startsWith(de('name.d_2')));
+    assert.ok(message_text(message, en).startsWith(en('name.d_2')));
+    // a message of the norm names the norm
+    const [norm_message] = check_inputs(raw({ f_ck: '55' }), en1992).messages;
+    assert.ok(message_text(norm_message, en).startsWith('EN 1992-1-1: f_ck = 55'));
 
-        const t = table(result.points, false, with_cult,
-                        with_radial && result.radial_defined);
-        assert.equal(t.head.includes('Ausnutzung radial'), with_radial);
-        assert.equal(t.head.includes('CULT-I'), with_cult);
-        assert.equal(t.head.includes('M_rel,i / M_rel,max'), with_cult);
-        assert.deepEqual(t.marks, ['', 'outside', '']);
-
-        const text = hints(en1992, result, loads, with_cult, with_radial).join('\n');
-        assert.equal(/Ausnutzung radial setzt proportionale Laststeigerung von N und M voraus\./
-            .test(text), with_radial);
-        assert.equal(/Reserve-Index/.test(text), with_cult);
-        const summary = summary_text(result.points, with_cult, with_radial);
-        assert.equal(/Grösste Ausnutzung radial der Punkte innerhalb/.test(summary),
-                     with_radial);
-        assert.equal(/Kleinstes CULT-I/.test(summary), with_cult);
-        assert.match(summary, /2 innerhalb, 1 ausserhalb/);
-    }
-});
-
-test('radial utilization: a load point of the calculation', () => {
-    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
-    const curves_only = calculate(params, en1992, null, false, true);
-    // a point of the curve as the load: utilization 1, half of it 0.5
-    const m = curves_only.values['Moment Reinf'][20] * 1000;
-    const n = curves_only.values['Normal Force Reinf'][20] * 1000;
-    const loads = { x: [m, m / 2, 0], y: [n, n / 2, 0], per_metre: false,
-                    name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, false, true);
-    const values = result.points.map(p => /** @type {number} */ (p.utilization));
-    assert.ok(Math.abs(values[0] - 1) < 1e-9);
-    assert.ok(Math.abs(values[1] - 0.5) < 1e-9);
-    assert.equal(values[2], 0);
-});
-
-test('radial utilization: with the minimum eccentricity at the modified moment', () => {
-    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
-                                    en1992);
-    // e0 = 0.02 m: the first point is moved to M = 20 kNm, the second not
-    const loads = { x: [5, 100], y: [-1000, -1000], per_metre: false,
-                    name: 'test.xlsx' };
-    const result = calculate(params, en1992, loads, false, true);
-    const plain_points = calculate(
-        { ...params, eccentricity: false }, en1992,
-        { x: [20, 100], y: [-1000, -1000], per_metre: false, name: 't' },
-        false, true).points;
-    assert.equal(result.points[0].m_mod, 0.02);
-    assert.equal(result.points[0].utilization, plain_points[0].utilization);
-    assert.equal(result.points[1].utilization, plain_points[1].utilization);
-    assert.match(hints(en1992, result, loads, false, true).join('\n'),
-                 /Mit Mindestausmitte am geprüften Punkt \(M_Ed,mod\)\./);
-});
-
-test('radial utilization: not defined for a plain concrete section', () => {
-    for (const norm of [en1992, sia262]) {
-        const { params } = check_inputs(raw({ a_s1: '0', a_s2: '0' }), norm);
-        const loads = { x: [10], y: [-1000], per_metre: false, name: 'test.xlsx' };
-        const result = calculate(params, norm, loads, false, true);
-        assert.equal(result.radial_defined, false);
-        // no number, and a hint instead
-        assert.equal(result.points[0].utilization, null);
-        const text = hints(norm, result, loads, false, true).join('\n');
-        assert.match(text, /Ausnutzung radial bei unbewehrtem Querschnitt nicht definiert\./);
-        assert.doesNotMatch(text, /proportionale Laststeigerung/);
-        // inside / outside is still determined
-        assert.equal(result.points[0].inside, true);
-        assert.doesNotMatch(summary_text(result.points, false, true),
-                            /Ausnutzung/);
-    }
-});
-test('rewrite_number: only the decimal sign changes, the value stays', () => {
-    assert.equal(rewrite_number('1.35', ','), '1,35');
-    assert.equal(rewrite_number('1,35', '.'), '1.35');
-    assert.equal(rewrite_number('1,35', ','), '1,35');
-    // the digits stay as typed, nothing is rounded or shortened
-    assert.equal(rewrite_number('0.350', ','), '0,350');
-    assert.equal(rewrite_number('1.0', ','), '1,0');
-    assert.equal(rewrite_number(' 2.58 ', ','), '2,58');
-    assert.equal(rewrite_number('-0.5', ','), '-0,5');
-    assert.equal(rewrite_number('.5', ','), ',5');
-    assert.equal(rewrite_number('30', ','), '30');
-    // reading and rewriting give the same number
-    for (const text of ['1.35', '1,35', '0.03', '0,030', '2,58', '500', '-1.5',
-                        '.25', '7.', '0.1', '123456.789']) {
-        for (const decimal of [',', '.']) {
-            const written = rewrite_number(text, decimal);
-            assert.equal(parse_number(written), parse_number(text),
-                         `«${text}» -> «${written}»`);
-            assert.equal(written.includes(decimal === ',' ? '.' : ','), false);
-        }
-    }
-    // text that is not a number is not touched
-    for (const text of ['', ' ', 'abc', '1.2.3', '1,2,3', '1e3', '5 m']) {
-        assert.equal(rewrite_number(text, ','), text);
-    }
+    // errors of the calculation
+    assert.equal(error_text(new TextError('xls.not_a_number',
+                                          { row: 4, cell: 'abc' }), en),
+                 en('xls.not_a_number', { row: 4, cell: 'abc' }));
+    assert.equal(error_text(new Error('other'), de), 'other');
 });
 
 test('shown_messages: an empty input is no error before the field is left', () => {
@@ -723,9 +296,10 @@ test('EXAMPLE: the values of the button give a calculation in both norms', () =>
         assert.deepEqual(messages, []);
         assert.equal(params.gamma_d, 1);
         assert.equal(params.f_ck, 30);
-        assert.notEqual(calculate(params, norm, null, false, true), null);
+        assert.notEqual(calculate(params, norm, null, { radial: true }), null);
     }
 });
+
 test('is_example: the result is marked as long as the values are the example', () => {
     // case 1: cross-section and materials are exactly the example values
     const example = /** @type {any} */ ({ ...raw(), ...EXAMPLE });
@@ -743,15 +317,20 @@ test('is_example: the result is marked as long as the values are the example', (
 
     // the figure names the example in the legend, and only then
     const { params } = check_inputs(example, en1992);
-    const result = calculate(params, en1992, null, false, true);
-    const marked = figure(result.input_values, result.values, en1992, [],
-                          { example: true, narrow: true });
-    assert.equal(/** @type {any} */ (marked.layout).legend.title.text, EXAMPLE_TEXT);
-    assert.equal(marked.legend_lines[0], EXAMPLE_TEXT);
-    assert.equal(EXAMPLE_TEXT, 'Beispielwerte, nicht projektbezogen');
-    const plain_figure = figure(result.input_values, result.values, en1992, []);
-    assert.equal(/** @type {any} */ (plain_figure.layout).legend.title, undefined);
-    assert.equal(plain_figure.legend_lines.includes(EXAMPLE_TEXT), false);
+    const result = calculate(params, en1992, null, { radial: true });
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const marked = figure(result.input_values, result.values, en1992, [], t,
+                              { example: true, narrow: true });
+        assert.equal(/** @type {any} */ (marked.layout).legend.title.text,
+                     t('example.note'));
+        assert.equal(marked.legend_lines[0], t('example.note'));
+        const plain_figure = figure(result.input_values, result.values, en1992,
+                                    [], t);
+        assert.equal(/** @type {any} */ (plain_figure.layout).legend.title,
+                     undefined);
+        assert.equal(plain_figure.legend_lines.includes(t('example.note')), false);
+    }
 });
 
 test('has_inputs: undo of the example is offered only if there was input', () => {
@@ -764,5 +343,548 @@ test('has_inputs: undo of the example is offered only if there was input', () =>
     // case 2: any of the fields the example overwrites was filled
     for (const field of Object.keys(EXAMPLE)) {
         assert.equal(has_inputs({ ...empty, [field]: '1' }), true, field);
+    }
+});
+
+test('calculate: load points are gamma_d * value / 1000', () => {
+    const { params } = check_inputs(raw(), en1992);
+    const loads = loads_of([100, -50], [-1000, -2000]);
+    const result = calculate(params, en1992, loads, { cult: true });
+    assert.equal(result.e0, null);
+    assert.equal(result.points.length, 2);
+    assert.equal(result.points[0].m, 1.35 * 100 / 1000);
+    assert.equal(result.points[0].n, 1.35 * -1000 / 1000);
+    for (const p of result.points) {
+        assert.equal(p.m_mod, p.m);
+        assert.equal(p.modified, false);
+        assert.equal(p.inside, true);
+        assert.deepEqual(p.cult, cult_I_details(p.m, p.n, result.values));
+    }
+    // without a file: only the curves
+    assert.deepEqual(calculate(params, en1992, null, { cult: true }).points, []);
+    // CULT-I switched off
+    assert.equal(calculate(params, en1992, loads).points[0].cult, null);
+});
+
+test('calculate: values per metre are multiplied by the width', () => {
+    const { params } = check_inputs(raw({ b_: '0.5' }), en1992);
+    const [point] = calculate(params, en1992,
+                              loads_of([100], [-1000], true)).points;
+    assert.equal(point.m, 1.35 * (100 * 0.5) / 1000);
+    assert.equal(point.n, 1.35 * (-1000 * 0.5) / 1000);
+});
+
+test('calculate: minimum eccentricity moves the load points (EN, D1)', () => {
+    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
+                                    en1992);
+    // e0 = max(h / 30; 20 mm) = 0.02 m for h = 0.30 m
+    const loads = loads_of([10, 100, 0], [-1000, -1000, -1000]);
+    const result = calculate(params, en1992, loads, { cult: true });
+    assert.equal(result.e0, 0.02);
+    const [small, large, zero] = result.points;
+    // |M| < e0 * |N| = 0.02: moved
+    assert.equal(small.modified, true);
+    assert.equal(small.m_mod, 0.02 * 1);
+    assert.equal(small.m, 0.01);
+    // |M| > e0 * |N|: unchanged
+    assert.equal(large.modified, false);
+    assert.equal(large.m_mod, 0.1);
+    // M = 0: one of the two signs governs
+    assert.equal(zero.modified, true);
+    assert.equal(Math.abs(zero.m_mod), 0.02);
+    // CULT-I belongs to the modified point
+    assert.deepEqual(small.cult, cult_I_details(0.02, -1, result.values));
+});
+
+test('table: values in kN and kNm with the intermediate values of CULT-I', () => {
+    const full = table(POINTS, de, { eccentricity: true, cult: true });
+    assert.deepEqual(full.head_keys, ['table.nr', 'table.n', 'table.m',
+        'table.m_mod', 'table.m_rel_i', 'table.n_rel_i', 'table.m_rel_max',
+        'table.n_rel_max', 'table.m_ratio', 'table.n_ratio', 'table.cult',
+        'table.hint']);
+    assert.deepEqual(full.head, full.head_keys.map(key => de(key)));
+    // German: decimal comma in all output
+    assert.deepEqual(full.rows[0], ['1', '-1500,0', '100,00', '100,00',
+        '200,00', '1250,0', '400,00', '2500,0',
+        // the two ratios with three decimals: 0.2 / 0.4 and 1.25 / 2.5
+        '0,500', '0,500', '0,500', '']);
+    assert.deepEqual(full.rows[1], ['2', '-1000,0', '900,00', '900,00',
+        '', '', '', '', '', '', de('cult.outside'), de('table.outside')]);
+    assert.equal(full.rows[2][3], '60,00');
+    assert.deepEqual(full.rows[2].slice(8, 12),
+                     ['0,750', '1,200', '1,200', de('table.above')]);
+    assert.deepEqual(full.marks, ['', 'outside', 'above']);
+    // the values behind the cells, for sorting: numbers, not text
+    assert.deepEqual(full.keys[0], [1, -1500, 100, 100, 200, 1250, 400, 2500,
+                                    0.5, 0.5, 0.5, null]);
+    assert.deepEqual(full.keys[1].slice(4), [null, null, null, null, null,
+        null, null, de('table.outside')]);
+    for (let i = 0; i < full.rows.length; i++) {
+        assert.equal(full.rows[i].length, full.head.length);
+        assert.equal(full.keys[i].length, full.head.length);
+    }
+
+    // English: decimal point, the same numbers behind the cells
+    const english = table(POINTS, en, { eccentricity: true, cult: true });
+    assert.deepEqual(english.head, english.head_keys.map(key => en(key)));
+    assert.deepEqual(english.rows[0], ['1', '-1500.0', '100.00', '100.00',
+        '200.00', '1250.0', '400.00', '2500.0', '0.500', '0.500', '0.500', '']);
+    assert.deepEqual(english.keys[0], full.keys[0]);
+    assert.deepEqual(english.marks, full.marks);
+
+    // nothing switched on: inside / outside is still shown
+    const short = table(POINTS, de);
+    assert.deepEqual(short.head_keys, ['table.nr', 'table.n', 'table.m',
+                                       'table.hint']);
+    assert.deepEqual(short.rows[0], ['1', '-1500,0', '100,00', '']);
+    assert.deepEqual(short.rows[1], ['2', '-1000,0', '900,00',
+                                     de('table.outside')]);
+    assert.deepEqual(short.marks, ['', 'outside', '']);
+
+    // radial utilization only: one column, above 1 outside, not capped
+    const radial = table(POINTS, de, { radial: true });
+    assert.deepEqual(radial.head_keys, ['table.nr', 'table.n', 'table.m',
+                                        'table.utilization', 'table.hint']);
+    assert.deepEqual(radial.rows.map(row => row[3]), ['0,400', '2,500', '0,750']);
+    assert.deepEqual(radial.keys.map(key => key[3]), [0.4, 2.5, 0.75]);
+    // sorted by the utilization, descending: the point outside first
+    assert.deepEqual(sort_order(radial.keys, 3, true), [1, 2, 0]);
+    // both: the utilization stands before the columns of CULT-I
+    const both = table(POINTS, de, { eccentricity: true, cult: true,
+                                     radial: true });
+    assert.equal(both.head_keys.indexOf('table.utilization'), 4);
+    assert.equal(both.head_keys.indexOf('table.m_rel_i'), 5);
+    assert.equal(both.head.length, full.head.length + 1);
+
+    assert.equal(min_cult_I(POINTS), 'outside');
+    assert.equal(min_cult_I([POINTS[0], POINTS[2]]), 0.5);
+    assert.equal(min_cult_I([]), null);
+    assert.equal(max_utilization(POINTS), 2.5);
+    assert.equal(max_utilization([]), null);
+});
+
+test('summary_text: points inside and outside, largest and smallest value', () => {
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const counts = t('summary.points', { total: 3, inside: 2, outside: 1 });
+        // nothing switched on: only the numbers of points
+        assert.equal(summary_text(POINTS, t), counts);
+        // CULT-I: the smallest value of the points inside
+        assert.equal(summary_text(POINTS, t, { cult: true }), counts + ' ' +
+                     t('summary.min_cult', { value: t.fmt(0.5, 3) }));
+        // radial utilization: the largest value inside, and of all points
+        // if there are points outside
+        assert.equal(summary_text(POINTS, t, { radial: true }), counts + ' ' +
+                     t('summary.max_inside', { value: t.fmt(0.75, 3) }) + ' ' +
+                     t('summary.max_all', { value: t.fmt(2.5, 3) }));
+        assert.equal(summary_text([POINTS[0], POINTS[2]], t,
+                                  { cult: true, radial: true }),
+                     t('summary.points', { total: 2, inside: 2, outside: 0 }) +
+                     ' ' + t('summary.max_inside', { value: t.fmt(0.75, 3) }) +
+                     ' ' + t('summary.min_cult', { value: t.fmt(0.5, 3) }));
+        // only a point outside: no value of the points inside
+        assert.equal(summary_text([POINTS[1]], t, { cult: true }),
+                     t('summary.points', { total: 1, inside: 0, outside: 1 }));
+        assert.equal(summary_text([], t, { cult: true, radial: true }), '');
+    }
+    assert.match(summary_text(POINTS, de, { radial: true }), /0,750.*2,500/);
+    assert.match(summary_text(POINTS, en, { radial: true }), /0\.750.*2\.500/);
+});
+
+test('sort_order: numbers are sorted as numbers, both directions', () => {
+    // as text, "-1000" < "-200" < "-30" < "5" < "50" would not be this order
+    const keys = [[1, -30], [2, 50], [3, -1000], [4, 5], [5, -200]];
+    assert.deepEqual(sort_order(keys, 1, false), [2, 4, 0, 3, 1]);
+    assert.deepEqual(sort_order(keys, 1, true), [1, 3, 0, 4, 2]);
+    // by the number of the point: the order of the file
+    assert.deepEqual(sort_order(keys, 0, false), [0, 1, 2, 3, 4]);
+    assert.deepEqual(sort_order(keys, 0, true), [4, 3, 2, 1, 0]);
+    // the keys are not changed
+    assert.deepEqual(keys[0], [1, -30]);
+});
+
+test('sort_order: empty cells are at the end, ascending and descending', () => {
+    // CULT-I of points outside of the curve is empty (null)
+    const keys = [[1, 0.3], [2, null], [3, 0.1], [4, null], [5, 0.9]];
+    assert.deepEqual(sort_order(keys, 1, false), [2, 0, 4, 1, 3]);
+    assert.deepEqual(sort_order(keys, 1, true), [4, 0, 2, 1, 3]);
+});
+
+test('sort_order: rows with the same value keep the order of the file', () => {
+    const keys = [[1, 2], [2, 1], [3, 2], [4, 1], [5, 2]];
+    assert.deepEqual(sort_order(keys, 1, false), [1, 3, 0, 2, 4]);
+    assert.deepEqual(sort_order(keys, 1, true), [0, 2, 4, 1, 3]);
+    // text (column of the hints): empty at the end
+    const hints_column = [['b'], [null], ['a'], ['b']];
+    assert.deepEqual(sort_order(hints_column, 0, false), [2, 0, 3, 1]);
+});
+
+test('sort_order: table of load points sorted by CULT-I', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    const loads = loads_of([10, 900, 50, -900, 30],
+                           [-1000, -1000, -2000, -1000, -3000]);
+    const result = calculate(params, en1992, loads, { cult: true });
+    const tab = table(result.points, en, { cult: true });
+    const column = tab.head_keys.indexOf('table.cult');
+    for (const descending of [false, true]) {
+        const order = sort_order(tab.keys, column, descending);
+        // every row once
+        assert.deepEqual(order.slice().sort(), [0, 1, 2, 3, 4]);
+        // the two points outside (2 and 4) are the last ones
+        assert.deepEqual(order.slice(3), [1, 3]);
+        const values = order.slice(0, 3).map(
+            i => /** @type {number} */ (tab.keys[i][column]));
+        for (let i = 1; i < values.length; i++) {
+            assert.ok(descending ? values[i - 1] >= values[i] :
+                                   values[i - 1] <= values[i]);
+        }
+        // the number of the point stays with its row
+        for (const i of order) {
+            assert.equal(tab.rows[i][0], String(i + 1));
+        }
+    }
+});
+
+test('figure: curves, the legend shows the f_cd that was used (N6)', () => {
+    const { params } = check_inputs(raw({ alpha_cc: '0.85' }), en1992);
+    const result = calculate(params, en1992, null);
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const fig = figure(result.input_values, result.values, en1992, [], t);
+        const [comparison, governing] = /** @type {any[]} */ (fig.data);
+        assert.equal(fig.data.length, 2);
+        // f_cd = 0.85 * 30 / 1.5 = 17
+        assert.ok(comparison.name.startsWith(
+            `${t('draw.concrete_comparison')}<br>` +
+            `${t('draw.f_cd', { f_cd: t.fmt(17, 2) })}<br>` +
+            `h = ${t.num(0.3)} m<br>b = 1 m<br>d_1 = ${t.num(0.05)} m`));
+        assert.ok(governing.name.startsWith(`${t('draw.reinforced')}<br>`));
+        // the curve with reinforcement governs: solid and stronger than the
+        // comparison line
+        assert.equal(governing.line.dash, 'solid');
+        assert.equal(comparison.line.dash, 'dash');
+        assert.ok(governing.line.width > comparison.line.width);
+        assert.notEqual(governing.line.color, comparison.line.color);
+        const layout = /** @type {any} */ (fig.layout);
+        assert.equal(layout.title.text, t('norm.en1992.label'));
+        assert.equal(layout.xaxis.title.text, t('axis.m'));
+        assert.equal(layout.yaxis.title.text, t('axis.n'));
+        // decimal sign of the language on the axes, too
+        assert.equal(layout.separators[0], t.decimal);
+        // closed curve: both sides, in kN and kNm
+        assert.equal(governing.x.length, result.values['Moment Reinf'].length +
+                     result.values['Moment Reinf Neg'].length);
+        assert.equal(governing.y[0],
+                     result.values['Normal Force Reinf'][0] * 1000);
+        assert.match(governing.text[0], /^M: .* kNm<br>N: .* kN$/);
+    }
+    assert.match(/** @type {any} */ (
+        figure(result.input_values, result.values, en1992, [], de).data[0]).name,
+        /f_cd = 17,00 N\/mm²/);
+    assert.match(/** @type {any} */ (
+        figure(result.input_values, result.values, en1992, [], en).data[0]).name,
+        /f_cd = 17\.00 N\/mm²/);
+});
+
+test('figure: plain concrete section, one curve with the reduced f_cd (D7)', () => {
+    const { params } = check_inputs(raw({ a_s1: '0', a_s2: '0' }), en1992);
+    const result = calculate(params, en1992, null);
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const fig = figure(result.input_values, result.values, en1992, [], t);
+        assert.equal(fig.data.length, 1);
+        const [curve] = /** @type {any[]} */ (fig.data);
+        // f_cd = alpha_cc,pl * 30 / 1.5 = 16
+        assert.ok(curve.name.startsWith(`${t('draw.concrete_plain')}<br>` +
+            `${t('draw.f_cd_reduced', { f_cd: t.fmt(16, 2) })}<br>`));
+        // the only curve governs: solid
+        assert.equal(curve.line.dash, 'solid');
+        assert.ok(hints(en1992, result, null, t).includes(t('hint.plain_en')));
+    }
+});
+
+test('figure: load points inside and outside are two traces with their numbers', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    // the second and the fourth point are far outside of the curve
+    const loads = loads_of([10, 900, 50, -900], [-1000, -1000, -2000, -1000]);
+    for (const cult of [true, false]) {
+        const result = calculate(params, en1992, loads, { cult: cult });
+        assert.deepEqual(result.points.map(p => p.inside),
+                         [true, false, true, false]);
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points, en);
+        const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
+        assert.equal(fig.data.length, 4);
+        assert.ok(inside.name.startsWith(
+            en('draw.points_inside', { count: 2, total: 4 }) + '<br>' +
+            en('draw.design_values', { gamma_d: 1 })));
+        assert.ok(outside.name.startsWith(
+            en('draw.points_outside', { count: 2, total: 4 }) + '<br>'));
+        // in kNm
+        assert.deepEqual(inside.x, [10, 50]);
+        assert.deepEqual(outside.x, [900, -900]);
+        assert.notEqual(inside.marker.color, outside.marker.color);
+        // the smallest CULT-I is the one of the points inside
+        assert.equal(inside.name.includes('CULT-I'), cult);
+        assert.equal(outside.name.includes('CULT-I'), false);
+        // the numbers of the points are the ones of the table
+        assert.ok(outside.text[1].startsWith(
+            en('draw.point', { number: 4 }) + '<br>'));
+        assert.ok(outside.text[1].endsWith(en('draw.outside')));
+    }
+
+    // all points inside: no trace for points outside
+    const all_inside = calculate(params, en1992, loads_of([10], [-1000]));
+    const names = figure(all_inside.input_values, all_inside.values, en1992,
+                         all_inside.points, de).data.map(
+        trace => /** @type {any} */ (trace).name);
+    assert.equal(names.length, 3);
+    assert.ok(names[2].startsWith(
+        de('draw.points_inside', { count: 1, total: 1 })));
+});
+
+test('figure: load points, ray of the minimum eccentricity (D1)', () => {
+    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
+                                    en1992);
+    const loads = loads_of([10, 100], [-1000, -1000]);
+    const result = calculate(params, en1992, loads, { cult: true });
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points, t, { e0: result.e0 });
+        const names = fig.data.map(trace => /** @type {any} */ (trace).name);
+        assert.equal(names.length, 5);
+        assert.equal(names[2], `${t('draw.min_eccentricity')}<br>` +
+                               `e0 = ${t.fmt(0.02, 3)} m<br>`);
+        assert.ok(names[3].startsWith(
+            t('draw.points_inside', { count: 2, total: 2 })));
+        assert.ok(names[3].includes(t('draw.min_cult', { value: '' }).trim()));
+        assert.equal(names[4], t('draw.points_moved'));
+        // the original points stay, only the moved point is drawn again
+        const [, , ray, original, moved] = /** @type {any[]} */ (fig.data);
+        assert.deepEqual(original.x, [10, 100]);
+        assert.deepEqual(original.y, [-1000, -1000]);
+        assert.deepEqual(moved.x, [20]);
+        // the ray: M = e0 * N at the largest compression force
+        assert.ok(Math.abs(ray.x[0] - -0.02 * ray.y[0]) < 1e-9);
+        assert.deepEqual([ray.x[1], ray.y[1]], [0, 0]);
+        // hover text of the moved point
+        assert.ok(original.text[0].startsWith(
+            `${t('draw.point', { number: 1 })}<br>M: ${t.fmt(10, 2)} kNm<br>` +
+            `N: ${t.fmt(-1000, 1)} kN<br>` +
+            t('draw.m_mod', { value: t.fmt(20, 2) })));
+
+        // small screen: the legend is given as text, one line for each trace
+        const narrow = figure(result.input_values, result.values, en1992,
+                              result.points, t, { e0: result.e0, narrow: true });
+        assert.equal(/** @type {any} */ (fig.layout).showlegend, undefined);
+        assert.equal(/** @type {any} */ (narrow.layout).showlegend, false);
+        assert.equal(/** @type {any} */ (narrow.layout).title.text, 'EN 1992-1-1');
+        assert.equal(narrow.legend_lines.length, narrow.data.length);
+        const colours = ['colour.comparison', 'colour.governing', 'colour.ray',
+                         'colour.inside', 'colour.moved'];
+        narrow.legend_lines.forEach((line, i) => {
+            assert.ok(line.startsWith(t(colours[i]) + ': '), line);
+            assert.equal(line.includes('<br>'), false);
+        });
+    }
+});
+
+test('radial utilization and CULT-I can be switched on and off', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    // the second point is far outside of the curve
+    const loads = loads_of([10, 900, 50], [-1000, -1000, -2000]);
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        for (const [cult, radial] of [[true, true], [true, false],
+                                      [false, true], [false, false]]) {
+            const shown = { cult: cult, radial: radial };
+            const result = calculate(params, en1992, loads, shown);
+            assert.equal(result.radial_defined, true);
+            // inside / outside is always determined
+            assert.deepEqual(result.points.map(p => p.inside),
+                             [true, false, true]);
+            for (const p of result.points) {
+                assert.equal(p.cult !== null, cult);
+                assert.equal(p.utilization !== null, radial);
+                if (p.utilization !== null) {
+                    // below 1 inside, above 1 outside
+                    assert.equal(p.utilization < 1, p.inside);
+                }
+            }
+            const fig = figure(result.input_values, result.values, en1992,
+                               result.points, t);
+            const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
+            // legend and hover text name only what is switched on
+            const utilization_label = t('draw.max_utilization', { value: '' });
+            const cult_label = t('draw.min_cult', { value: '' });
+            assert.equal(inside.name.includes(utilization_label), radial);
+            assert.equal(outside.name.includes(utilization_label), radial);
+            assert.equal(inside.name.includes(cult_label), cult);
+            assert.equal(inside.text[0].includes(
+                t('draw.utilization', { value: '' })), radial);
+            assert.equal(inside.text[0].includes(
+                t('draw.cult', { value: '' })), cult);
+            assert.ok(outside.text[0].endsWith(t('draw.outside')));
+
+            const tab = table(result.points, t, shown);
+            assert.equal(tab.head_keys.includes('table.utilization'), radial);
+            assert.equal(tab.head_keys.includes('table.cult'), cult);
+            assert.equal(tab.head_keys.includes('table.m_ratio'), cult);
+            assert.deepEqual(tab.marks, ['', 'outside', '']);
+
+            const lines = hints(en1992, result, loads, t, shown);
+            assert.equal(lines.includes(t('hint.radial')), radial);
+            assert.equal(lines.includes(t('hint.radial_assumption')), radial);
+            assert.equal(lines.includes(t('hint.cult')), cult);
+            const summary = summary_text(result.points, t, shown);
+            assert.ok(summary.startsWith(
+                t('summary.points', { total: 3, inside: 2, outside: 1 })));
+            assert.equal(summary.includes(
+                t('summary.max_inside', { value: '' }).slice(0, -1)), radial);
+            assert.equal(summary.includes(
+                t('summary.min_cult', { value: '' }).slice(0, -1)), cult);
+        }
+    }
+});
+
+test('radial utilization: a load point of the calculation', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    const curves_only = calculate(params, en1992, null, { radial: true });
+    // a point of the curve as the load: utilization 1, half of it 0.5
+    const m = curves_only.values['Moment Reinf'][20] * 1000;
+    const n = curves_only.values['Normal Force Reinf'][20] * 1000;
+    const result = calculate(params, en1992, loads_of([m, m / 2, 0], [n, n / 2, 0]),
+                             { radial: true });
+    const values = result.points.map(p => /** @type {number} */ (p.utilization));
+    assert.ok(Math.abs(values[0] - 1) < 1e-9);
+    assert.ok(Math.abs(values[1] - 0.5) < 1e-9);
+    assert.equal(values[2], 0);
+});
+
+test('radial utilization: with the minimum eccentricity at the modified moment', () => {
+    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
+                                    en1992);
+    // e0 = 0.02 m: the first point is moved to M = 20 kNm, the second not
+    const loads = loads_of([5, 100], [-1000, -1000]);
+    const result = calculate(params, en1992, loads, { radial: true });
+    const plain_points = calculate({ ...params, eccentricity: false }, en1992,
+                                   loads_of([20, 100], [-1000, -1000]),
+                                   { radial: true }).points;
+    assert.equal(result.points[0].m_mod, 0.02);
+    assert.equal(result.points[0].utilization, plain_points[0].utilization);
+    assert.equal(result.points[1].utilization, plain_points[1].utilization);
+    assert.ok(hints(en1992, result, loads, en, { radial: true }).includes(
+        en('hint.radial_min_eccentricity')));
+});
+
+test('radial utilization: not defined for a plain concrete section', () => {
+    for (const norm of [en1992, sia262]) {
+        const { params } = check_inputs(raw({ a_s1: '0', a_s2: '0' }), norm);
+        const loads = loads_of([10], [-1000]);
+        const result = calculate(params, norm, loads, { radial: true });
+        assert.equal(result.radial_defined, false);
+        // no number, and a hint instead
+        assert.equal(result.points[0].utilization, null);
+        const lines = hints(norm, result, loads, de, { radial: true });
+        assert.ok(lines.includes(de('hint.radial_undefined')));
+        assert.equal(lines.includes(de('hint.radial_assumption')), false);
+        // inside / outside is still determined
+        assert.equal(result.points[0].inside, true);
+        assert.equal(summary_text(result.points, de, { radial: true }),
+                     de('summary.points', { total: 1, inside: 1, outside: 0 }));
+    }
+});
+
+test('hints: norm, simplifications and the handling of the file', () => {
+    const { params } = check_inputs(raw({ b_: '0.5' }), sia262);
+    const loads = loads_of([100], [-1000], true);
+    const result = calculate(params, sia262, loads, { cult: true });
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const lines = hints(sia262, result, loads, t, { cult: true });
+        for (const key of ['norm.note.second_order', 'norm.note.k_sigma',
+                           'hint.pivot_c', 'hint.sign', 'hint.cult']) {
+            assert.ok(lines.includes(t(key)), key);
+        }
+        assert.ok(lines.includes(t('hint.steel', { limit: '12' })));
+        assert.ok(lines.includes(t('hint.per_metre', { b: 0.5 })));
+        assert.ok(lines.includes(t('hint.loads', { name: 'test.xlsx', count: 1,
+                                                    gamma_d: 1.35 })));
+        // f_cd with the numbers that were used
+        assert.equal(lines[0], t('hint.f_cd_sia', {
+            eta_fc: t.fmt(1, 3), eta_t: 0.85, f_ck: 30, gamma_c: 1.5,
+            f_cd: t.fmt(17, 2) }));
+        // every parameter is filled in
+        for (const line of lines) {
+            assert.doesNotMatch(line, /[{}]|undefined/, line);
+        }
+        // the title of the diagram names the norm
+        const fig = figure(result.input_values, result.values, sia262,
+                           result.points, t);
+        assert.equal(/** @type {any} */ (fig.layout).title.text, 'SIA 262:2025');
+
+        // EN mode: no hint of the SIA mode, none about the load points
+        // without a file
+        const checked = check_inputs(raw(), en1992);
+        const en_lines = hints(en1992, calculate(checked.params, en1992, null),
+                               null, t, { cult: true });
+        assert.ok(en_lines.includes(t('norm.note.second_order')));
+        assert.equal(en_lines.includes(t('norm.note.k_sigma')), false);
+        assert.equal(en_lines.includes(t('hint.pivot_c')), false);
+        assert.equal(en_lines.includes(t('hint.cult')), false);
+    }
+    // decimal sign of the language in the hints
+    assert.match(hints(sia262, result, loads, de).join('\n'),
+                 /= 1,000 · 0,85 · 30 \/ 1,5 = 17,00 N\/mm²/);
+    assert.match(hints(sia262, result, loads, en).join('\n'),
+                 /= 1\.000 · 0\.85 · 30 \/ 1\.5 = 17\.00 N\/mm²/);
+});
+
+test('hover text, table and core give the same CULT-I for every point', () => {
+    // points on a grid, inside and outside, with and without the minimum
+    // eccentricity
+    /** @type {number[]} */
+    const x = [];
+    /** @type {number[]} */
+    const y = [];
+    for (let i = -6; i <= 6; i++) {
+        for (let j = 0; j <= 8; j++) {
+            x.push(i * 40);
+            y.push(-j * 700 + 100);
+        }
+    }
+    const loads = loads_of(x, y);
+    for (const eccentricity of [false, true]) {
+        const { params } = check_inputs(raw({ eccentricity: eccentricity }),
+                                        en1992);
+        const result = calculate(params, en1992, loads, { cult: true });
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points, en, { e0: result.e0 });
+        const tab = table(result.points, en,
+                          { eccentricity: eccentricity, cult: true });
+        const column = tab.head_keys.indexOf('table.cult');
+        /** @type {Map<number, string>} */
+        const hover = new Map();
+        for (const trace of /** @type {any[]} */ (fig.data)) {
+            if (trace.mode !== 'markers' || trace.name === en('draw.points_moved')) {
+                continue;
+            }
+            for (const text of trace.text) {
+                const number = Number(/ (\d+)<br>/.exec(text)?.[1]);
+                const cult = /CULT-I: ([\d.]+)/.exec(text);
+                hover.set(number, cult ? cult[1] : en('cult.outside'));
+            }
+        }
+        assert.equal(hover.size, result.points.length);
+        result.points.forEach((p, i) => {
+            const details = cult_I_details(p.m_mod, p.n, result.values);
+            const core = (details === 'outside') ? en('cult.outside') :
+                details.cult_I.toFixed(3);
+            assert.equal(tab.rows[i][column], core, `point ${i + 1}, table`);
+            assert.equal(hover.get(i + 1), core, `point ${i + 1}, hover`);
+        });
+        assert.ok(result.points.some(p => p.inside));
+        assert.ok(result.points.some(p => !p.inside));
     }
 });
