@@ -291,23 +291,29 @@ test('N9: distance to the ends of the curve for m = 0', () => {
     };
     const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
     // M_rel,max = 1, N_rel,max = -0.5 - (-2) = 3 / 2
-    // m = 0: M_rel,i = M_rel,max = 1
-    /** @param {number} n_rel_i */
-    const expected = (n_rel_i) =>
-        Math.sqrt((1 ** 2 + n_rel_i ** 2) / (1 ** 2 + 1.5 ** 2));
+    // m = 0: M_rel,i is the moment of the curve for this normal force (N11)
+    /**
+     * @param {number} m_rel_i
+     * @param {number} n_rel_i
+     */
+    const expected = (m_rel_i, n_rel_i) =>
+        Math.sqrt((m_rel_i ** 2 + n_rel_i ** 2) / (1 ** 2 + 1.5 ** 2));
 
-    // n = -0.25: 1.75 to the compression end, 1.25 to the tension end
+    // n = -0.25: 1.75 to the compression end, 1.25 to the tension end;
+    // curve between (1, -0.5) and (0, 1): M = 1 - 0.25 / 1.5
     const result_1 = /** @type {number} */ (
         cult_I(0, -0.25, input_values, values));
-    assert.ok(Math.abs(result_1 - expected(1.25)) <= 0.0005);
-    // n = -1.5: 0.5 to the compression end, 2.5 to the tension end
+    assert.ok(Math.abs(result_1 - expected(1 - 0.25 / 1.5, 1.25)) <= 0.0005);
+    // n = -1.5: 0.5 to the compression end, 2.5 to the tension end;
+    // curve between (0, -2) and (1, -0.5): M = 0.5 / 1.5
     const result_2 = /** @type {number} */ (
         cult_I(0, -1.5, input_values, values));
-    assert.ok(Math.abs(result_2 - expected(0.5)) <= 0.0005);
-    // n = +0.5 (tension): 2.5 to the compression end, 0.5 to the tension end
+    assert.ok(Math.abs(result_2 - expected(0.5 / 1.5, 0.5)) <= 0.0005);
+    // n = +0.5 (tension): 2.5 to the compression end, 0.5 to the tension end;
+    // M = 1 - 1 / 1.5
     const result_3 = /** @type {number} */ (
         cult_I(0, 0.5, input_values, values));
-    assert.ok(Math.abs(result_3 - expected(0.5)) <= 0.0005);
+    assert.ok(Math.abs(result_3 - expected(1 - 1 / 1.5, 0.5)) <= 0.0005);
 });
 
 /**
@@ -433,5 +439,103 @@ test('N10: a mirrored section gives the same CULT-I for the mirrored point', () 
         // rounded to three decimals: one step of tolerance
         assert.ok(Math.abs(/** @type {number} */ (a) - /** @type {number} */ (b))
                   <= 0.001, `m = ${m}, n = ${n}: ${a} != ${b}`);
+    }
+});
+
+// sections for the CULT-I tests with curves from int_diagram
+const SYMMETRIC_SECTIONS = [
+    {},
+    { h_: 0.30, d_1: 0.05, d_2: 0.05, a_s1: 5.24, a_s2: 5.24, f_ck: 30 },
+    { a_s1: 0, a_s2: 0 },
+];
+const UNSYMMETRIC_SECTIONS = [
+    { a_s1: 3, a_s2: 9, d_1: 0.03, d_2: 0.06 },
+    { a_s1: 9, a_s2: 3, d_1: 0.06, d_2: 0.03 },
+    { a_s1: 5, a_s2: 0 },
+];
+
+test('N11: m = 0 and a very small moment give the same CULT-I', () => {
+    for (const params of SYMMETRIC_SECTIONS) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        const n_compression = Math.min(...values['Normal Force Reinf']);
+        const n_tension = Math.max(...values['Normal Force Reinf']);
+        for (let i = 1; i < 20; i++) {
+            const n = n_compression + (n_tension - n_compression) * i / 20;
+            const zero = /** @type {number} */ (
+                cult_I(0, n, input_values, values));
+            for (const m of [1e-7, -1e-7]) {
+                const small = /** @type {number} */ (
+                    cult_I(m, n, input_values, values));
+                // rounded to three decimals: one step of tolerance
+                assert.ok(Math.abs(zero - small) <= 0.001,
+                          `n = ${n}: ${zero} (m = 0), ${small} (m = ${m})`);
+            }
+        }
+    }
+});
+
+test('N11: m = 0, unsymmetric section: the smaller of both sides governs', () => {
+    for (const params of UNSYMMETRIC_SECTIONS) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        const n_compression = Math.min(...values['Normal Force Reinf']);
+        const n_tension = Math.max(...values['Normal Force Reinf']);
+        // away from the ends of the curve, where M = 0 is inside
+        for (let i = 4; i <= 16; i++) {
+            const n = n_compression + (n_tension - n_compression) * i / 20;
+            const zero = /** @type {number} */ (
+                cult_I(0, n, input_values, values));
+            const right = /** @type {number} */ (
+                cult_I(1e-7, n, input_values, values));
+            const left = /** @type {number} */ (
+                cult_I(-1e-7, n, input_values, values));
+            assert.ok(Math.abs(zero - Math.min(right, left)) <= 0.001,
+                      `n = ${n}: ${zero} (m = 0), ${right}, ${left}`);
+        }
+    }
+});
+
+test('CULT-I of all points inside the curve is between 0 and 1', () => {
+    // This holds if N_rel,max is at least half of the span of the normal
+    // force: N_rel,i is the distance to the nearest point of the curve and
+    // so at most half of the span; M_rel,i is at most M_rel,max.
+    // The section with one layer (a_s1 = 5, a_s2 = 0) does not meet the
+    // condition on its negative side and is left out (see NOTES.md, N10).
+    const sections = SYMMETRIC_SECTIONS.concat(UNSYMMETRIC_SECTIONS.slice(0, 2));
+    for (const params of sections) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        const span = Math.max(...values['Normal Force Reinf']) -
+            Math.min(...values['Normal Force Reinf']);
+        for (const side of ['', ' Neg']) {
+            const moments = values['Moment Reinf' + side].map(Math.abs);
+            const forces = values['Normal Force Reinf' + side];
+            const n_rel_max = forces[moments.indexOf(Math.max(...moments))] -
+                Math.min(...forces);
+            assert.ok(n_rel_max >= span / 2, 'condition of this test');
+        }
+
+        const m_min = Math.min(...values['Moment Reinf Neg']);
+        const m_max = Math.max(...values['Moment Reinf']);
+        const n_min = Math.min(...values['Normal Force Reinf']);
+        let inside = 0;
+        for (let i = 0; i <= 40; i++) {
+            for (let j = 0; j <= 40; j++) {
+                const m = m_min + (m_max - m_min) * i / 40;
+                const n = n_min + span * j / 40;
+                const result_i = cult_I(m, n, input_values, values);
+                if (result_i === 'outside') {
+                    continue;
+                }
+                inside++;
+                assert.ok(result_i >= 0 && result_i <= 1,
+                          `m = ${m}, n = ${n}: ${result_i}`);
+            }
+        }
+        assert.ok(inside > 0);
     }
 });
