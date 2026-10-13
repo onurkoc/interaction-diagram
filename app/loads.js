@@ -33,3 +33,21 @@ export function design_values(x, y, gamma_d) {
     const n = y.map(value => gamma_d * value / 1000);
     return [m, n];
 }
+
+/**
+ * The whole chain from the values of the table (xls_read.js) to the
+ * load points of the diagram: forces per metre are multiplied by the
+ * width first, then the load factor is applied.
+ * @param {number[]} x  moments as read, [kNm] or [kNm/m]
+ * @param {number[]} y  normal forces as read, [kN] or [kN/m]
+ * @param {boolean} per_metre  true: values per metre (Plaxis 2D)
+ * @param {number} b_  width of the cross-section [m]
+ * @param {number} gamma_d  load factor
+ * @returns {[number[], number[]]} moments [MNm], normal forces [MN]
+ */
+export function load_points(x, y, per_metre, b_, gamma_d) {
+    if (per_metre) {
+        [x, y] = section_forces(x, y, b_);
+    }
+    return design_values(x, y, gamma_d);
+}
