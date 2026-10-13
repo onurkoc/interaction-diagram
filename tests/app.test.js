@@ -75,7 +75,9 @@ test('check_inputs: complete input gives the parameters', () => {
 });
 
 test('check_inputs: the cross-section has no presets, an empty field is rejected', () => {
-    for (const field of ['h_', 'b_', 'a_s1', 'a_s2', 'd_1', 'd_2']) {
+    // the same for the materials f_ck and f_yk
+    for (const field of ['h_', 'b_', 'a_s1', 'a_s2', 'd_1', 'd_2',
+                         'f_ck', 'f_yk']) {
         const { messages } = check_inputs(raw({ [field]: '' }), en1992);
         assert.deepEqual(fields(messages), [field]);
         assert.match(messages[0].text, / fehlt\.$/);
