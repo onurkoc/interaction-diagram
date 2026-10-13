@@ -10,7 +10,10 @@ Two design codes can be chosen:
 - **SIA 262:2025**
 - **EN 1992-1-1** without National Annex (recommended values)
 
-The interface is in German.
+The interface is in German and English (switch DE | EN at the top right).
+A new visitor gets German if the browser is set to German, otherwise
+English; the choice is kept in the browser. The input stays when the
+language is changed.
 
 ## Scope and limits
 
@@ -66,8 +69,15 @@ not yet by a comparison with independent numbers.
    choose it with the button.
 4. Read the diagram, the hints below it and the table.
 
-A decimal point or a decimal comma can be typed. The output uses a decimal
-comma. Forces are shown in kN and kNm.
+A decimal point or a decimal comma can be typed, in both languages. The
+output follows the language: a decimal comma in German, a decimal point in
+English. A number is written again with that sign when the field is left;
+its value and its digits do not change. Forces are shown in kN and kNm.
+
+The button «Beispiel laden» / «Load example» fills in example values. As
+long as cross-section and materials are exactly these values, the diagram
+is marked «Beispielwerte, nicht projektbezogen» / «Example values, not
+from a project».
 
 ### Sign convention
 
@@ -257,6 +267,12 @@ shows a message instead of the app.
 
 ## For developers
 
+All texts of the interface are in `app/i18n.js`, one table for each
+language. The calculation does not contain texts: it reports problems as
+a key with parameters (`TextError`), and the interface looks the text up.
+A further language is one more table with the same keys; a test checks
+that every key exists in every table.
+
 Vanilla JavaScript (ES modules) with types as JSDoc comments. No framework,
 no build step. Plotly.js and SheetJS are stored in `app/vendor/`, nothing
 is loaded from a CDN.
@@ -270,6 +286,8 @@ app/                the static app
   strain_planes.js  strain planes (pivot points A, B, C)
   cult_i.js         CULT-I
   utilization.js    radial utilization
+  i18n.js           all texts, one table for each language
+  errors.js         errors as keys of the texts, with parameters
   intersection.js   intersection of two curves
   xls_read.js       reading the Excel file
   loads.js          width and load factor
