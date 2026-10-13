@@ -131,8 +131,12 @@ test('check_inputs: invalid input is rejected, not corrected', () => {
     for (const alpha_cc of ['0.79', '1.01']) {
         const { messages } = check_inputs(raw({ alpha_cc: alpha_cc }), en1992);
         assert.equal(messages.length, 1);
-        assert.match(messages[0].text, /alpha_cc/);
+        // the message shows the number with a decimal comma
+        assert.match(messages[0].text,
+                     new RegExp(`alpha_cc = ${alpha_cc.replace('.', ',')}:`));
     }
+    assert.match(check_inputs(raw({ d_1: '0.4' }), en1992).messages[0].text,
+                 /Achsabstand d_1 = 0,4 m: muss kleiner als die Höhe h = 0,3 m sein/);
     assert.deepEqual(check_inputs(raw({ alpha_cc: '0,8' }), en1992).messages, []);
     // alpha_cc is not checked in the SIA mode
     assert.deepEqual(check_inputs(raw({ alpha_cc: '5' }), sia262).messages, []);
@@ -207,12 +211,13 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     assert.deepEqual(full.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]',
         'M_Ed,mod [kNm]', 'M_rel,i [kNm]', 'N_rel,i [kN]',
         'M_rel,max [kNm]', 'N_rel,max [kN]', 'CULT-I', 'Hinweis']);
-    assert.deepEqual(full.rows[0], ['1', '-1500.0', '100.00', '100.00',
-        '200.00', '1250.0', '400.00', '2500.0', '0.500', '']);
-    assert.deepEqual(full.rows[1], ['2', '-1000.0', '900.00', '900.00',
+    // decimal comma in all output
+    assert.deepEqual(full.rows[0], ['1', '-1500,0', '100,00', '100,00',
+        '200,00', '1250,0', '400,00', '2500,0', '0,500', '']);
+    assert.deepEqual(full.rows[1], ['2', '-1000,0', '900,00', '900,00',
         '', '', '', '', 'ausserhalb', 'Punkt ausserhalb der Kurve']);
-    assert.equal(full.rows[2][3], '60.00');
-    assert.equal(full.rows[2][8], '1.200');
+    assert.equal(full.rows[2][3], '60,00');
+    assert.equal(full.rows[2][8], '1,200');
     assert.deepEqual(full.marks, ['', 'outside', 'above']);
     for (const row of full.rows) {
         assert.equal(row.length, full.head.length);
@@ -220,12 +225,12 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
 
     const short = table(points, false, false);
     assert.deepEqual(short.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]']);
-    assert.deepEqual(short.rows[0], ['1', '-1500.0', '100.00']);
+    assert.deepEqual(short.rows[0], ['1', '-1500,0', '100,00']);
 
     // summary: number of points outside and the smallest CULT-I inside
     assert.equal(summary_text(points, true),
         '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der ' +
-        'Kurve. Kleinstes CULT-I der Punkte innerhalb: 0.500.');
+        'Kurve. Kleinstes CULT-I der Punkte innerhalb: 0,500.');
     assert.equal(summary_text(points, false),
         '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der Kurve.');
     assert.equal(summary_text([points[1]], true),
@@ -243,7 +248,7 @@ test('figure: the legend shows the f_cd that was used (N6)', () => {
     const fig = figure(result.input_values, result.values, en1992, []);
     // f_cd = 0.85 * 30 / 1.5 = 17
     assert.equal(fig.data.length, 2);
-    assert.match(/** @type {any} */ (fig.data[0]).name, /f_cd = 17\.00 N\/mm²/);
+    assert.match(/** @type {any} */ (fig.data[0]).name, /f_cd = 17,00 N\/mm²/);
     assert.match(/** @type {any} */ (fig.data[0]).name,
                  /Beton ohne Bewehrung \(Vergleich\)/);
     assert.match(/** @type {any} */ (fig.data[1]).name, /Mit Bewehrung/);
@@ -255,6 +260,9 @@ test('figure: the legend shows the f_cd that was used (N6)', () => {
     assert.ok(governing.line.width > comparison.line.width);
     assert.notEqual(governing.line.color, comparison.line.color);
     assert.equal(/** @type {any} */ (fig.layout).title.text, en1992.label);
+    // decimal comma on the axes, too
+    assert.equal(/** @type {any} */ (fig.layout).separators[0], ',');
+    assert.match(/** @type {any} */ (fig.data[0]).name, /h = 0,3 m<br>b = 1 m<br>d_1 = 0,05 m/);
     // closed curve: both sides
     assert.equal(/** @type {any} */ (fig.data[1]).x.length,
                  result.values['Moment Reinf'].length +
@@ -268,7 +276,7 @@ test('figure: plain concrete section, one curve with the reduced f_cd (D7)', () 
     assert.equal(fig.data.length, 1);
     // f_cd = alpha_cc,pl * 30 / 1.5 = 16
     assert.match(/** @type {any} */ (fig.data[0]).name,
-                 /Beton unbewehrt<br>f_cd = 16\.00 N\/mm² \(abgemindert\)/);
+                 /Beton unbewehrt<br>f_cd = 16,00 N\/mm² \(abgemindert\)/);
     // the only curve governs: solid
     assert.equal(/** @type {any} */ (fig.data[0]).line.dash, 'solid');
     assert.ok(hints(en1992, result, null, true).some(
@@ -285,9 +293,9 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
                        result.points, { e0: result.e0 });
     const names = fig.data.map(trace => /** @type {any} */ (trace).name);
     assert.equal(names.length, 5);
-    assert.match(names[2], /Mindestausmitte M = ±e0·N<br>e0 = 0\.020 m/);
+    assert.match(names[2], /Mindestausmitte M = ±e0·N<br>e0 = 0,020 m/);
     assert.match(names[3],
-        /^Lastpunkte innerhalb: 2 von 2<br>Bemessungswerte, γ_d = 1<br>min\. CULT-I: \d\.\d{3}$/);
+        /^Lastpunkte innerhalb: 2 von 2<br>Bemessungswerte, γ_d = 1<br>min\. CULT-I: \d,\d{3}$/);
     assert.equal(names[4], 'Lastpunkte mit Mindestausmitte');
     // the original points stay, only the moved point is drawn again
     // the diagram is in kNm and kN
@@ -303,7 +311,7 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
     assert.match(layout.xaxis.title.text, /\[kNm\]/);
     assert.match(layout.yaxis.title.text, /\[kN\]/);
     assert.match(/** @type {any} */ (fig.data[3]).text[0],
-                 /^Punkt 1<br>M: 10\.00 kNm<br>N: -1000\.0 kN<br>M mit Mindestausmitte: 20\.00 kNm/);
+                 /^Punkt 1<br>M: 10,00 kNm<br>N: -1000,0 kN<br>M mit Mindestausmitte: 20,00 kNm/);
     assert.match(/** @type {any} */ (fig.data[1]).text[0], /^M: .* kNm<br>N: .* kN$/);
     // the curve itself: 1000 times the values of the calculation
     assert.equal(/** @type {any} */ (fig.data[1]).y[0],
@@ -319,7 +327,12 @@ test('hints: norm, simplifications and the handling of the file', () => {
     assert.match(text, /ohne Effekte 2\. Ordnung/);
     assert.match(text, /nicht aus SIA 262/);
     assert.match(text, /12 ‰/);
-    assert.match(text, /mit der Breite b = 0\.5 m multipliziert/);
+    assert.match(text, /= 1,000 · 0,85 · 30 \/ 1,5 = 17,00 N\/mm²/);
+    assert.match(text, /mit γ_d = 1,35 multipliziert/);
+    // no number with a decimal point in the hints
+    assert.doesNotMatch(text.replace(/[\d)] \. |2\. Ordnung|6\.1 \(5\)|z\. B\./g, ''),
+                        /\d\.\d/);
+    assert.match(text, /mit der Breite b = 0,5 m multipliziert/);
     assert.match(text, /Positives M: Zug auf der Seite von a_s1/);
     assert.match(text, /Reserve-Index, keine Ausnutzung/);
     // the legend of the SIA mode names the norm
@@ -351,8 +364,8 @@ test('figure: small screen, the legend is given as text', () => {
     // one line for each trace, with its colour
     assert.equal(narrow.legend_lines.length, narrow.data.length);
     assert.match(narrow.legend_lines[0],
-                 /^grau gestrichelt, dünn: Beton ohne Bewehrung \(Vergleich\), f_cd = 20\.00 N\/mm²/);
-    assert.match(narrow.legend_lines[1], /^blau durchgezogen: Mit Bewehrung, a_s1 = 5\.24 cm²/);
+                 /^grau gestrichelt, dünn: Beton ohne Bewehrung \(Vergleich\), f_cd = 20,00 N\/mm²/);
+    assert.match(narrow.legend_lines[1], /^blau durchgezogen: Mit Bewehrung, a_s1 = 5,24 cm²/);
     assert.match(narrow.legend_lines[2], /^orange strichpunktiert: Mindestausmitte/);
     assert.match(narrow.legend_lines[3], /^grüne Punkte: Lastpunkte innerhalb: 2 von 2, /);
     assert.match(narrow.legend_lines[4], /^hohle Punkte: Lastpunkte mit Mindestausmitte$/);

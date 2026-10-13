@@ -50,6 +50,15 @@ Decisions D1..D7 and findings E1..E10: see NOTES.md.
  * @property {string[]} notes  hints shown in the interface
  */
 
+/**
+ * Number for a message, with a decimal comma as in the interface.
+ * @param {number | undefined} x
+ * @returns {string}
+ */
+export function comma(x) {
+    return String(x).replace('.', ',');
+}
+
 /** @type {Norm} */
 export const en1992 = {
     name: 'EN 1992-1-1',
@@ -104,12 +113,13 @@ export const en1992 = {
         const messages = [];
         if (p.f_ck > this.f_ck_max) {
             // Tabelle 3.1 (D4)
-            messages.push(`f_ck = ${p.f_ck} N/mm²: nur bis ` +
+            messages.push(`f_ck = ${comma(p.f_ck)} N/mm²: nur bis ` +
                           `${this.f_ck_max} N/mm² (C50/60) zulässig.`);
         }
         if (p.alpha_cc === undefined || p.alpha_cc < 0.8 || p.alpha_cc > 1.0) {
             // 3.1.6 (1)
-            messages.push(`alpha_cc = ${p.alpha_cc}: zulässig ist 0,8 bis 1,0.`);
+            messages.push(`alpha_cc = ${comma(p.alpha_cc)}: ` +
+                          'zulässig ist 0,8 bis 1,0.');
         }
         return messages;
     },
