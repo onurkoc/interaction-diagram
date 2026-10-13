@@ -279,12 +279,24 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
         /^Lastpunkte innerhalb: 2 von 2<br>Bemessungswerte, γ_d = 1<br>min\. CULT-I: \d\.\d{3}$/);
     assert.equal(names[4], 'Lastpunkte mit Mindestausmitte');
     // the original points stay, only the moved point is drawn again
-    assert.deepEqual(/** @type {any} */ (fig.data[3]).x, [0.01, 0.1]);
-    assert.deepEqual(/** @type {any} */ (fig.data[4]).x, [0.02]);
+    // the diagram is in kNm and kN
+    assert.deepEqual(/** @type {any} */ (fig.data[3]).x, [10, 100]);
+    assert.deepEqual(/** @type {any} */ (fig.data[3]).y, [-1000, -1000]);
+    assert.deepEqual(/** @type {any} */ (fig.data[4]).x, [20]);
     // the ray: M = e0 * N at the largest compression force
     const ray = /** @type {any} */ (fig.data[2]);
-    assert.equal(ray.x[0], -0.02 * ray.y[0]);
+    assert.ok(Math.abs(ray.x[0] - -0.02 * ray.y[0]) < 1e-9);
     assert.deepEqual([ray.x[1], ray.y[1]], [0, 0]);
+    // units of the axes and of the hover texts
+    const layout = /** @type {any} */ (fig.layout);
+    assert.match(layout.xaxis.title.text, /\[kNm\]/);
+    assert.match(layout.yaxis.title.text, /\[kN\]/);
+    assert.match(/** @type {any} */ (fig.data[3]).text[0],
+                 /^Punkt 1<br>M: 10\.00 kNm<br>N: -1000\.0 kN<br>M mit Mindestausmitte: 20\.00 kNm/);
+    assert.match(/** @type {any} */ (fig.data[1]).text[0], /^M: .* kNm<br>N: .* kN$/);
+    // the curve itself: 1000 times the values of the calculation
+    assert.equal(/** @type {any} */ (fig.data[1]).y[0],
+                 result.values['Normal Force Reinf'][0] * 1000);
 });
 
 test('hints: norm, simplifications and the handling of the file', () => {
@@ -350,8 +362,8 @@ test('figure: load points inside and outside are two traces with their numbers',
         assert.equal(fig.data.length, 4);
         assert.match(inside.name, /^Lastpunkte innerhalb: 2 von 4<br>/);
         assert.match(outside.name, /^Lastpunkte ausserhalb der Kurve: 2 von 4<br>/);
-        assert.deepEqual(inside.x, [0.01, 0.05]);
-        assert.deepEqual(outside.x, [0.9, -0.9]);
+        assert.deepEqual(inside.x, [10, 50]);
+        assert.deepEqual(outside.x, [900, -900]);
         assert.notEqual(inside.marker.color, outside.marker.color);
         // the smallest CULT-I is the one of the points inside
         assert.equal(/min\. CULT-I/.test(inside.name), with_cult);

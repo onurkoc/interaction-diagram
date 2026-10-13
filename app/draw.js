@@ -25,7 +25,7 @@ without a browser. draw() hands them to Plotly.
 /**
  * One load point of the diagram, design values.
  * @typedef {Object} LoadPoint
- * @property {number} m  moment [MNm]
+ * @property {number} m  moment [MNm] (the diagram shows kNm and kN)
  * @property {number} n  normal force [MN], compression negative
  * @property {number} m_mod  moment used for the check [MNm]: m, or the
  *     moment with the minimum eccentricity (EN 1992-1-1 6.1 (4))
@@ -62,13 +62,23 @@ export function fmt(x, digits) {
 }
 
 /**
- * @param {number[]} moments
- * @param {number[]} forces
+ * The diagram shows kN and kNm, like the table; the calculation uses
+ * MN and MNm (as legacy/core.py).
+ * @param {number[]} values  [MN] or [MNm]
+ * @returns {number[]} [kN] or [kNm]
+ */
+function kilo(values) {
+    return values.map(value => value * 1000);
+}
+
+/**
+ * @param {number[]} moments  [kNm]
+ * @param {number[]} forces  [kN]
  * @returns {string[]}
  */
 function hover_curve(moments, forces) {
     return moments.map((m, i) =>
-        `M: ${fmt(m, 3)} MNm<br>N: ${fmt(forces[i], 3)} MN`);
+        `M: ${fmt(m, 2)} kNm<br>N: ${fmt(forces[i], 1)} kN`);
 }
 
 /**
@@ -138,9 +148,10 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
     };
 
     // closed curve: right side, then the left side backwards
-    const concrete_x = val['Moment'].concat(val['Moment Neg'].slice().reverse());
-    const concrete_y = val['Normal Force'].concat(
-        val['Normal Force Neg'].slice().reverse());
+    const concrete_x = kilo(val['Moment'].concat(
+        val['Moment Neg'].slice().reverse()));
+    const concrete_y = kilo(val['Normal Force'].concat(
+        val['Normal Force Neg'].slice().reverse()));
     const section = `h = ${i_val['h']} m<br>b = ${i_val['b']} m<br>` +
         `d_1 = ${i_val['d_1']} m<br>d_2 = ${i_val['d_2']} m<br>`;
     let name_concrete;
@@ -168,10 +179,10 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
     });
 
     if (!i_val['plain']) {
-        const reinf_x = val['Moment Reinf'].concat(
-            val['Moment Reinf Neg'].slice().reverse());
-        const reinf_y = val['Normal Force Reinf'].concat(
-            val['Normal Force Reinf Neg'].slice().reverse());
+        const reinf_x = kilo(val['Moment Reinf'].concat(
+            val['Moment Reinf Neg'].slice().reverse()));
+        const reinf_y = kilo(val['Normal Force Reinf'].concat(
+            val['Normal Force Reinf Neg'].slice().reverse()));
         add('blau durchgezogen', {
             type: 'scatter',
             x: reinf_x,
@@ -194,8 +205,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         const n_min = Math.min(...val['Normal Force Reinf']);
         add('orange strichpunktiert', {
             type: 'scatter',
-            x: [-e0 * n_min, 0, e0 * n_min],
-            y: [n_min, 0, n_min],
+            x: kilo([-e0 * n_min, 0, e0 * n_min]),
+            y: kilo([n_min, 0, n_min]),
             mode: 'lines',
             name: `Mindestausmitte M = ±e0·N<br>e0 = ${fmt(e0, 3)} m<br>`,
             line: { color: '#c06000', dash: 'dashdot', width: 1.5 },
@@ -212,10 +223,11 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
          * @returns {string}
          */
         const hover_point = (p, i) => {
-            let text = `Punkt ${i + 1}<br>M: ${fmt(p.m, 3)} MNm<br>` +
-                `N: ${fmt(p.n, 3)} MN`;
+            let text = `Punkt ${i + 1}<br>M: ${fmt(p.m * 1000, 2)} kNm<br>` +
+                `N: ${fmt(p.n * 1000, 1)} kN`;
             if (p.modified) {
-                text += `<br>M mit Mindestausmitte: ${fmt(p.m_mod, 3)} MNm`;
+                text += '<br>M mit Mindestausmitte: ' +
+                    `${fmt(p.m_mod * 1000, 2)} kNm`;
             }
             if (!p.inside) {
                 text += '<br>ausserhalb der Kurve';
@@ -238,8 +250,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
             }
             add('grüne Punkte', {
                 type: 'scatter',
-                x: inside.map(entry => entry.p.m),
-                y: inside.map(entry => entry.p.n),
+                x: kilo(inside.map(entry => entry.p.m)),
+                y: kilo(inside.map(entry => entry.p.n)),
                 mode: 'markers',
                 name: name_inside,
                 marker: {
@@ -256,8 +268,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         if (outside.length > 0) {
             add('rote Punkte', {
                 type: 'scatter',
-                x: outside.map(entry => entry.p.m),
-                y: outside.map(entry => entry.p.n),
+                x: kilo(outside.map(entry => entry.p.m)),
+                y: kilo(outside.map(entry => entry.p.n)),
                 mode: 'markers',
                 name: `Lastpunkte ausserhalb der Kurve: ${outside.length} ` +
                     `von ${total}<br>Bemessungswerte, γ_d = ${i_val['gamma_d']}`,
@@ -278,8 +290,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         if (moved.length > 0) {
             add('hohle Punkte', {
                 type: 'scatter',
-                x: moved.map(p => p.m_mod),
-                y: moved.map(p => p.n),
+                x: kilo(moved.map(p => p.m_mod)),
+                y: kilo(moved.map(p => p.n)),
                 mode: 'markers',
                 name: 'Lastpunkte mit Mindestausmitte',
                 marker: {
@@ -289,8 +301,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
                     line: { color: '#555', width: 1.5 },
                 },
                 text: moved.map(p =>
-                    `M mit Mindestausmitte: ${fmt(p.m_mod, 3)} MNm<br>` +
-                    `N: ${fmt(p.n, 3)} MN`),
+                    `M mit Mindestausmitte: ${fmt(p.m_mod * 1000, 2)} kNm<br>` +
+                    `N: ${fmt(p.n * 1000, 1)} kN`),
                 hoverinfo: 'text',
                 hoverlabel: HOVERLABEL,
             });
@@ -305,15 +317,15 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         hovermode: 'closest',
         autosize: true,
         xaxis: {
-            tickformat: '.2f',
-            title: { text: 'Moment M [MNm]', font: { size: 16 } },
+            tickformat: '.0f',
+            title: { text: 'Moment M [kNm]', font: { size: 16 } },
             zeroline: true,
         },
         yaxis: {
             // compression (negative) at the top, as in legacy/draw_diagram.py
             autorange: 'reversed',
-            tickformat: '.1f',
-            title: { text: 'Normalkraft N [MN], Druck negativ',
+            tickformat: '.0f',
+            title: { text: 'Normalkraft N [kN], Druck negativ',
                      font: { size: 16 } },
             zeroline: true,
         },
