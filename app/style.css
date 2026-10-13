@@ -331,6 +331,12 @@ footer {
     margin-top: 16px;
 }
 
+/* what has been compared with another program, and what has not */
+.validation {
+    max-width: 860px;
+    margin: 16px 0 8px;
+}
+
 /* small screen: one column */
 
 @media (max-width: 800px) {
