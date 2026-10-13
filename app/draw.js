@@ -47,6 +47,8 @@ without a browser. draw() hands them to Plotly.
 const GOVERNING_LINE = { color: '#1f4e79', dash: 'solid', width: 3.5 };
 const COMPARISON_LINE = { color: '#888888', dash: 'dash', width: 1.5 };
 
+export const EXAMPLE_TEXT = 'Beispielwerte, nicht projektbezogen';
+
 const HOVERLABEL = {
     bordercolor: 'gray',
     bgcolor: 'lightgray',
@@ -157,9 +159,11 @@ export function max_utilization(points) {
  * @param {Object} [options]
  * @param {number | null} [options.e0]  minimum eccentricity [m], null: none
  * @param {boolean} [options.narrow]  small screen: legend below the diagram
+ * @param {boolean} [options.example]  the input is the example, not a project
  * @returns {Figure}
  */
-export function figure(i_val, val, norm, points, { e0 = null, narrow = false } = {}) {
+export function figure(i_val, val, norm, points,
+                       { e0 = null, narrow = false, example = false } = {}) {
     /** @type {Object[]} */
     const data = [];
     // the legend as text, one line for each trace (for small screens)
@@ -381,6 +385,11 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
             borderwidth: 1.5,
         },
     };
+    if (example) {
+        // example values are named in the legend
+        layout.legend.title = { text: EXAMPLE_TEXT, font: { size: 12 } };
+        legend_lines.unshift(EXAMPLE_TEXT);
+    }
     if (narrow) {
         // small screen: short title, no legend inside the diagram
         // (the page shows legend_lines below it)

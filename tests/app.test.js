@@ -7,9 +7,10 @@ The tests check what follows from the rules of the interface
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
-         summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE }
+         summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE,
+         is_example, has_inputs }
     from '../app/app.js';
-import { figure, min_cult_I } from '../app/draw.js';
+import { figure, min_cult_I, EXAMPLE_TEXT } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { sia262 } from '../app/norms/sia262.js';
@@ -723,5 +724,45 @@ test('EXAMPLE: the values of the button give a calculation in both norms', () =>
         assert.equal(params.gamma_d, 1);
         assert.equal(params.f_ck, 30);
         assert.notEqual(calculate(params, norm, null, false, true), null);
+    }
+});
+test('is_example: the result is marked as long as the values are the example', () => {
+    // case 1: cross-section and materials are exactly the example values
+    const example = /** @type {any} */ ({ ...raw(), ...EXAMPLE });
+    assert.equal(is_example(example), true);
+    // the number counts, not the way it is written
+    assert.equal(is_example({ ...example, h_: '0,350', b_: '1' }), true);
+    // load factor, eta_t and the partial factors are not part of it
+    assert.equal(is_example({ ...example, gamma_d: '1,35', eta_t: '1.0',
+                              gamma_c: '1.2' }), true);
+    // case 2: one value changed, or a field emptied: not the example
+    for (const field of ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk']) {
+        assert.equal(is_example({ ...example, [field]: '9' }), false, field);
+        assert.equal(is_example({ ...example, [field]: '' }), false, field);
+    }
+
+    // the figure names the example in the legend, and only then
+    const { params } = check_inputs(example, en1992);
+    const result = calculate(params, en1992, null, false, true);
+    const marked = figure(result.input_values, result.values, en1992, [],
+                          { example: true, narrow: true });
+    assert.equal(/** @type {any} */ (marked.layout).legend.title.text, EXAMPLE_TEXT);
+    assert.equal(marked.legend_lines[0], EXAMPLE_TEXT);
+    assert.equal(EXAMPLE_TEXT, 'Beispielwerte, nicht projektbezogen');
+    const plain_figure = figure(result.input_values, result.values, en1992, []);
+    assert.equal(/** @type {any} */ (plain_figure.layout).legend.title, undefined);
+    assert.equal(plain_figure.legend_lines.includes(EXAMPLE_TEXT), false);
+});
+
+test('has_inputs: undo of the example is offered only if there was input', () => {
+    const empty = /** @type {any} */ ({
+        ...raw(), h_: '', b_: '', a_s1: '', d_1: '', a_s2: '', d_2: '',
+        f_ck: '', f_yk: '', eta_t: '', gamma_d: '' });
+    // case 1: empty form (the partial factors come from the norm): no undo
+    assert.equal(has_inputs(empty), false);
+    assert.equal(has_inputs({ ...empty, h_: '  ' }), false);
+    // case 2: any of the fields the example overwrites was filled
+    for (const field of Object.keys(EXAMPLE)) {
+        assert.equal(has_inputs({ ...empty, [field]: '1' }), true, field);
     }
 });
