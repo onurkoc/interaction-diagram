@@ -384,3 +384,54 @@ test('N10: N_rel,i is the distance to the nearest point of the closed curve', ()
         cult_I(0.125, -1.75, input_values, values));
     assert.ok(Math.abs(result - expected) <= 0.0005);
 });
+
+test('N10: M_rel,max and N_rel,max are taken from the side of the point', () => {
+    // Two different sides: right M_max = 1 at N = -1.5,
+    // left M_max = 2 at N = -0.5; compression end at N = -2.
+    const values = /** @type {any} */ ({
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0, 1, 0],
+        'Normal Force Reinf': [-2, -1.5, 0],
+        'Moment Reinf Neg': [0, -2, 0],
+        'Normal Force Reinf Neg': [-2, -0.5, 0],
+    });
+    const input_values = /** @type {any} */ ({ a_s1: 3, a_s2: 9 });
+
+    // right side: M_rel,max = 1, N_rel,max = 0.5
+    // point (0.5, -1.5): M_rel,i = 0.5; curve for M = 0.5 at N = -1.75
+    // and N = -0.75, N_rel,i = 0.25
+    assert.equal(cult_I(0.5, -1.5, input_values, values),
+                 Math.sqrt((0.5 ** 2 + 0.25 ** 2) / (1 ** 2 + 0.5 ** 2)));
+
+    // left side: M_rel,max = 2, N_rel,max = 1.5
+    // point (-1, -0.5): M_rel,i = 1; curve for M = -1 at N = -1.25 and
+    // N = -0.25, N_rel,i = 0.25
+    const expected = Math.sqrt((1 ** 2 + 0.25 ** 2) / (2 ** 2 + 1.5 ** 2));
+    const result = /** @type {number} */ (
+        cult_I(-1, -0.5, input_values, values));
+    assert.ok(Math.abs(result - expected) <= 0.0005);
+});
+
+test('N10: a mirrored section gives the same CULT-I for the mirrored point', () => {
+    // swapping the two layers swaps the sides of the diagram (N2)
+    const result = int_diagram({ a_s1: 3, a_s2: 9, d_1: 0.03, d_2: 0.06 });
+    const swapped = int_diagram({ a_s1: 9, a_s2: 3, d_1: 0.06, d_2: 0.03 });
+    assert.notEqual(result, null);
+    assert.notEqual(swapped, null);
+    const [input_values, values] = /** @type {any} */ (result);
+    const [input_swapped, values_swapped] = /** @type {any} */ (swapped);
+    for (const [m, n] of [[0.1, -2], [-0.1, -2], [0.3, -4], [-0.3, -4],
+                          [0.05, -8], [-0.05, -8], [0.2, -0.5], [-0.2, -0.5]]) {
+        const a = cult_I(m, n, input_values, values);
+        const b = cult_I(-m, n, input_swapped, values_swapped);
+        if (a === 'outside' || b === 'outside') {
+            // (0.2, -0.5) is outside of this curve, on both sections
+            assert.equal(a, b, `m = ${m}, n = ${n}`);
+            continue;
+        }
+        // rounded to three decimals: one step of tolerance
+        assert.ok(Math.abs(/** @type {number} */ (a) - /** @type {number} */ (b))
+                  <= 0.001, `m = ${m}, n = ${n}: ${a} != ${b}`);
+    }
+});

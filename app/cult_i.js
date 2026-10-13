@@ -61,6 +61,23 @@ function distance_to_ends(n, limit_y) {
 }
 
 /**
+ * M_rel,max and N_rel,max of one side of the curve: the largest moment
+ * of the side and the distance from its normal force to the end of the
+ * curve on the compression side.
+ * @param {number[]} limit_x  moments of the side
+ * @param {number[]} limit_y  normal forces of the side
+ * @param {number} m_extreme  largest moment of the side: the maximum on
+ *     the positive side, the minimum on the negative side
+ * @returns {[number, number]} M_rel,max, N_rel,max
+ */
+function rel_max(limit_x, limit_y, m_extreme) {
+    // normal force of the largest moment (first point, if there are several)
+    const n_at_m_extreme = limit_y[limit_x.indexOf(m_extreme)];
+    // compression is negative: the end on the compression side is the minimum
+    return [Math.abs(m_extreme), n_at_m_extreme - min(limit_y)];
+}
+
+/**
  * capacity utilization of linings in tunnels (CULT-I)
  * according to the paper:
  * Performance indicator of tunnel linings under geotechnical uncertainty;
@@ -72,6 +89,7 @@ function distance_to_ends(n, limit_y) {
  * in the 'centre' of the curve (M = 0, normal force of the largest
  * moment): M_rel,max is the largest moment, N_rel,max the distance from
  * its normal force to the end of the curve on the compression side.
+ * Both are taken from the side of the curve with the sign of m.
  * @param {number} m  x coordinate of a point, moment
  * @param {number} n  y coordinate of a point, normal force
  * @param {InputValues} input_values  input values from int_diagram
@@ -87,11 +105,18 @@ export function cult_I(m, n, input_values, values) {
     const limit_x_neg = values['Moment Reinf Neg'];
     const limit_y_neg = values['Normal Force Reinf Neg'];
 
-    const m_rel_max = Math.abs(max(limit_x_pos));
-    // normal force of the largest moment (first point, if there are several)
-    const n_at_m_max = limit_y[limit_x_pos.indexOf(max(limit_x_pos))];
-    // compression is negative: the end on the compression side is the minimum
-    const n_rel_max = n_at_m_max - min(limit_y);
+    // Reference values of the side of the point. The paper shows a
+    // symmetric curve; a side of its own for each sign of the moment is
+    // an extension for unsymmetric reinforcement (see NOTES.md).
+    // m = 0: positive side.
+    let m_rel_max, n_rel_max;
+    if (m >= 0) {
+        [m_rel_max, n_rel_max] = rel_max(limit_x_pos, limit_y,
+                                         max(limit_x_pos));
+    } else {
+        [m_rel_max, n_rel_max] = rel_max(limit_x_neg, limit_y_neg,
+                                         min(limit_x_neg));
+    }
 
     const horizontal_cut_x = [min(limit_x_neg),
                               max(limit_x_pos)];
