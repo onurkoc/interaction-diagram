@@ -112,7 +112,8 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | N3 | umgesetzt: CULT-I verwendet auf beiden Seiten die bewehrte Kurve mit ihren eigenen Normalkräften |
 | N4 | umgesetzt: Bei mehreren Schnittpunkten gilt der äusserste (M-Richtung) bzw. der nächste (N-Richtung), kein Abbruch mehr |
 | N9 | umgesetzt: Abstand zu den Enden der Kurve = min(n − N_min; N_max − n) |
-| N10 | am Originalaufsatz geprüft (2026-10-13), Befund in Abschnitt 4; Entscheid Onur offen, Code unverändert |
+| N10 (a) | umgesetzt (Entscheid Onur 2026-10-13): N_rel,max = Abstand von der Normalkraft bei M_max bis zum Ende der Kurve auf der Druckseite, nach dem Aufsatz. Der Sonderfall a_s1 = 0 (ganze Spanne) entfällt. Bei mehreren Punkten mit gleichem M_max gilt der erste. Damit weicht CULT-I von `legacy/cult_i.py` ab; der Vergleich mit der Python-Referenz für CULT-I ist entfernt (Abschnitt 6). |
+| N10 (b), (c) | Entscheid Onur liegt vor, Umsetzung folgt |
 | N11 | offen: Zweig m = 0 setzt M_rel,i = M_rel,max; Entscheid Onur offen, Code unverändert |
 | N5, N6 | offen, mit der Oberfläche |
 | N8 | umgesetzt für Excel und Plaxis 2D: Spaltenköpfe «n» und «m» werden exakt erkannt (optional mit Einheit in eckigen Klammern). Die Einheit entscheidet über die Art der Tabelle: ohne Einheit, [kN], [kNm] = Schnittgrössen des Querschnitts; [kN/m], [kNm/m] = Plaxis, pro Meter. Unbekannte oder gemischte Einheiten werden abgelehnt (vorher wurde [kN/m] still als [kN] gelesen). Entscheide Onur (2026-10-13) für Plaxis: Spalten N und M der Phase, nicht die Umhüllenden N_min/N_max/M_min/M_max; Umrechnung mit der Querschnittsbreite (Wert · b, `section_forces` in `loads.js`); Vorzeichen von M wie in der Datei, N negativ = Druck; alle Zeilen werden gelesen, auch Knoten, die zu zwei Elementen gehören. |

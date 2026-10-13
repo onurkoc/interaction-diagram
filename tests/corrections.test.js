@@ -290,7 +290,7 @@ test('N9: distance to the ends of the curve for m = 0', () => {
         'Normal Force Reinf Neg': [-2, -0.5, 1],
     };
     const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
-    // M_rel,max = 1, N_rel,max = 3 / 2 (rule of cult_i.py, see N10)
+    // M_rel,max = 1, N_rel,max = -0.5 - (-2) = 3 / 2
     // m = 0: M_rel,i = M_rel,max = 1
     /** @param {number} n_rel_i */
     const expected = (n_rel_i) =>
@@ -308,4 +308,55 @@ test('N9: distance to the ends of the curve for m = 0', () => {
     const result_3 = /** @type {number} */ (
         cult_I(0, 0.5, input_values, values));
     assert.ok(Math.abs(result_3 - expected(0.5)) <= 0.0005);
+});
+
+/**
+ * Simple curve (rhombus) for the CULT-I tests: largest moment 1 at the
+ * normal force n_at_m_max, ends of the curve at n_compression and
+ * n_tension. Both sides are the same.
+ * @param {number} n_compression
+ * @param {number} n_at_m_max
+ * @param {number} n_tension
+ * @returns {any} values
+ */
+function rhombus(n_compression, n_at_m_max, n_tension) {
+    const n = [n_compression, n_at_m_max, n_tension];
+    return {
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0, 1, 0],
+        'Normal Force Reinf': n,
+        'Moment Reinf Neg': [0, -1, 0],
+        'Normal Force Reinf Neg': n,
+    };
+}
+
+test('N10: N_rel,max is the distance from N at M_max to the compression end', () => {
+    // largest moment at N = -1.5, compression end at N = -2: N_rel,max = 0.5
+    // (half of the span would be 1.5)
+    const values = rhombus(-2, -1.5, 1);
+    // point (0.5, -1.5): the curve is at M = 1 for this N, M_rel,i = 0.5;
+    // for M = 0.5 the curve is at N = -1.75 and N = -0.25, N_rel,i = 0.25
+    const expected = Math.sqrt((0.5 ** 2 + 0.25 ** 2) / (1 ** 2 + 0.5 ** 2));
+    for (const a_s1 of [0, 5]) {
+        // no special rule for a_s1 = 0 any more
+        const input_values = /** @type {any} */ ({ a_s1: a_s1, a_s2: 5 });
+        assert.equal(cult_I(0.5, -1.5, input_values, values), expected);
+    }
+});
+
+test('N10: the point in the centre of a symmetric curve gives 1', () => {
+    // centre: M = 0 and the normal force of the largest moment
+    const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
+    assert.equal(cult_I(0, -1, input_values, rhombus(-2, -1, 0)), 1);
+});
+
+test('N10: a point on the curve gives 0', () => {
+    const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
+    const values = rhombus(-2, -1, 0);
+    // corner and points on the edges
+    assert.equal(cult_I(1, -1, input_values, values), 0);
+    assert.equal(cult_I(0.5, -1.5, input_values, values), 0);
+    assert.equal(cult_I(0.5, -0.5, input_values, values), 0);
+    assert.equal(cult_I(-0.5, -1.5, input_values, values), 0);
 });
