@@ -42,6 +42,9 @@ without a browser. draw() hands them to Plotly.
  * @property {string[]} legend_lines  the legend as text, for small screens
  */
 
+const GOVERNING_LINE = { color: '#1f4e79', dash: 'solid', width: 3.5 };
+const COMPARISON_LINE = { color: '#888888', dash: 'dash', width: 1.5 };
+
 const HOVERLABEL = {
     bordercolor: 'gray',
     bgcolor: 'lightgray',
@@ -149,13 +152,16 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         name_concrete = 'Beton ohne Bewehrung (Vergleich)<br>' +
             `f_cd = ${fmt(i_val['f_cd'], 2)} N/mm²<br>` + section;
     }
-    add('blau', {
+    // The governing curve is drawn solid and strong: the curve with
+    // reinforcement, or the concrete curve of a plain section. With
+    // reinforcement the concrete curve is only a comparison line.
+    add(i_val['plain'] ? 'blau durchgezogen' : 'grau gestrichelt, dünn', {
         type: 'scatter',
         x: concrete_x,
         y: concrete_y,
         mode: 'lines',
         name: name_concrete,
-        line: { color: 'blue', width: 3 },
+        line: i_val['plain'] ? GOVERNING_LINE : COMPARISON_LINE,
         text: hover_curve(concrete_x, concrete_y),
         hoverinfo: 'text',
         hoverlabel: HOVERLABEL,
@@ -166,7 +172,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
             val['Moment Reinf Neg'].slice().reverse());
         const reinf_y = val['Normal Force Reinf'].concat(
             val['Normal Force Reinf Neg'].slice().reverse());
-        add('grün gestrichelt', {
+        add('blau durchgezogen', {
             type: 'scatter',
             x: reinf_x,
             y: reinf_y,
@@ -175,7 +181,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
                 `a_s1 = ${fmt(i_val['a_s1'], 2)} cm²<br>` +
                 `a_s2 = ${fmt(i_val['a_s2'], 2)} cm²<br>` +
                 `f_yd = ${fmt(i_val['f_yd'], 2)} N/mm²<br>`,
-            line: { color: 'green', dash: 'dash', width: 3 },
+            line: GOVERNING_LINE,
             text: hover_curve(reinf_x, reinf_y),
             hoverinfo: 'text',
             hoverlabel: HOVERLABEL,
@@ -186,13 +192,13 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         // minimum eccentricity (EN 1992-1-1 6.1 (4), D1): rays M = +-e0 * N
         // for compression, from the largest compression force to N = 0 and back
         const n_min = Math.min(...val['Normal Force Reinf']);
-        add('grau gestrichelt', {
+        add('orange strichpunktiert', {
             type: 'scatter',
             x: [-e0 * n_min, 0, e0 * n_min],
             y: [n_min, 0, n_min],
             mode: 'lines',
             name: `Mindestausmitte M = ±e0·N<br>e0 = ${fmt(e0, 3)} m<br>`,
-            line: { color: 'gray', dash: 'dash', width: 1.5 },
+            line: { color: '#c06000', dash: 'dashdot', width: 1.5 },
             hoverinfo: 'skip',
         });
     }

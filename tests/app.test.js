@@ -223,6 +223,13 @@ test('figure: the legend shows the f_cd that was used (N6)', () => {
     assert.match(/** @type {any} */ (fig.data[0]).name,
                  /Beton ohne Bewehrung \(Vergleich\)/);
     assert.match(/** @type {any} */ (fig.data[1]).name, /Mit Bewehrung/);
+    // the curve with reinforcement governs: solid and stronger than the
+    // comparison line
+    const [comparison, governing] = /** @type {any[]} */ (fig.data);
+    assert.equal(governing.line.dash, 'solid');
+    assert.equal(comparison.line.dash, 'dash');
+    assert.ok(governing.line.width > comparison.line.width);
+    assert.notEqual(governing.line.color, comparison.line.color);
     assert.equal(/** @type {any} */ (fig.layout).title.text, en1992.label);
     // closed curve: both sides
     assert.equal(/** @type {any} */ (fig.data[1]).x.length,
@@ -238,6 +245,8 @@ test('figure: plain concrete section, one curve with the reduced f_cd (D7)', () 
     // f_cd = alpha_cc,pl * 30 / 1.5 = 16
     assert.match(/** @type {any} */ (fig.data[0]).name,
                  /Beton unbewehrt<br>f_cd = 16\.00 N\/mm² \(abgemindert\)/);
+    // the only curve governs: solid
+    assert.equal(/** @type {any} */ (fig.data[0]).line.dash, 'solid');
     assert.ok(hints(en1992, result, null, true).some(
         hint => hint.includes('EN 12.6.2')));
 });
@@ -306,9 +315,9 @@ test('figure: small screen, the legend is given as text', () => {
     // one line for each trace, with its colour
     assert.equal(narrow.legend_lines.length, narrow.data.length);
     assert.match(narrow.legend_lines[0],
-                 /^blau: Beton ohne Bewehrung \(Vergleich\), f_cd = 20\.00 N\/mm²/);
-    assert.match(narrow.legend_lines[1], /^grün gestrichelt: Mit Bewehrung, a_s1 = 5\.24 cm²/);
-    assert.match(narrow.legend_lines[2], /^grau gestrichelt: Mindestausmitte/);
+                 /^grau gestrichelt, dünn: Beton ohne Bewehrung \(Vergleich\), f_cd = 20\.00 N\/mm²/);
+    assert.match(narrow.legend_lines[1], /^blau durchgezogen: Mit Bewehrung, a_s1 = 5\.24 cm²/);
+    assert.match(narrow.legend_lines[2], /^orange strichpunktiert: Mindestausmitte/);
     assert.match(narrow.legend_lines[3], /^grüne Punkte: Lastpunkte innerhalb: 2 von 2, /);
     assert.match(narrow.legend_lines[4], /^hohle Punkte: Lastpunkte mit Mindestausmitte$/);
 });
