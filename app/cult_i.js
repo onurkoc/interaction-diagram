@@ -100,31 +100,35 @@ export function cult_I(m, n, input_values, values) {
     const vertical_cut_x = [m, m];
     const vertical_cut_y = [max(limit_y),
                             min(limit_y)];
+    // Normal forces of the curve for the moment m. The two sides together
+    // are the closed curve. With unsymmetric reinforcement its ends are not
+    // at M = 0, so the vertical cut can hit the curve of the other side.
+    const [, y2_pos] = intersection(vertical_cut_x,
+                                    vertical_cut_y,
+                                    limit_x_pos,
+                                    limit_y);
+    const [, y2_neg] = intersection(vertical_cut_x,
+                                    vertical_cut_y,
+                                    limit_x_neg,
+                                    limit_y_neg);
+    const y2 = y2_pos.concat(y2_neg);
+
     let m_rel_i, n_rel_i;
     if (m > 0) {
         const [x1] = intersection(horizontal_cut_x,
                                   horizontal_cut_y,
                                   limit_x_pos,
                                   limit_y);
-        const [, y2] = intersection(vertical_cut_x,
-                                    vertical_cut_y,
-                                    limit_x_pos,
-                                    limit_y);
         if (x1.length === 0 || y2.length === 0) {
             return 'outside';
         }
         // several intersection points (e.g. the cut goes through a point
         // of the curve): the outermost one is the limit
         m_rel_i = max(x1) - m;
-        if (y2.length > 1) {
-            // the nearest of all intersection points
-            n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        } else {
-            n_rel_i = Math.abs(y2[0] - n);
-            if (n_rel_i > n_rel_max) {
-                n_rel_i = distance_to_ends(n, limit_y);
-            }
-        }
+        // The nearest of all intersection points. The paper shows N_rel,i
+        // only for a point on the compression side of the centre, towards
+        // the compression end (assumption, see NOTES.md).
+        n_rel_i = min(y2.map(y => Math.abs(y - n)));
         if (m_rel_i < 0) {
             return 'outside';
         }
@@ -140,24 +144,13 @@ export function cult_I(m, n, input_values, values) {
                                   horizontal_cut_y,
                                   limit_x_neg,
                                   limit_y_neg);
-        const [, y2] = intersection(vertical_cut_x,
-                                    vertical_cut_y,
-                                    limit_x_neg,
-                                    limit_y_neg);
         if (x1.length === 0 || y2.length === 0) {
             return 'outside';
         }
         // several intersection points: the outermost one is the limit
         m_rel_i = min(x1) - m;
-        if (y2.length > 1) {
-            // the nearest of all intersection points
-            n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        } else {
-            n_rel_i = Math.abs(y2[0] - n);
-            if (n_rel_i > n_rel_max) {
-                n_rel_i = distance_to_ends(n, limit_y_neg);
-            }
-        }
+        // the nearest of all intersection points, as on the positive side
+        n_rel_i = min(y2.map(y => Math.abs(y - n)));
         if (m_rel_i > 0) {
             return 'outside';
         }
