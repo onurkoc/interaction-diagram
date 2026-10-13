@@ -115,9 +115,12 @@
                     <input type="text" inputmode="decimal" id="f_ck" value="" data-example="30"></label>
                 <label><span data-i18n="label.f_yk">Betonstahl f_yk [N/mm²]</span>
                     <input type="text" inputmode="decimal" id="f_yk" value="" data-example="500"></label>
-                <label><span data-i18n="label.gamma_c">γ_c</span>
+                <!-- the two norms have different names for these factors -->
+                <label><span data-norm="sia262" data-i18n="label.gamma_c.sia262">γ_c</span>
+                    <span data-norm="en1992" data-i18n="label.gamma_c.en1992">γ_c</span>
                     <input type="text" inputmode="decimal" id="gamma_c" value=""></label>
-                <label><span data-i18n="label.gamma_s">γ_s</span>
+                <label><span data-norm="sia262" data-i18n="label.gamma_s.sia262">γ_s</span>
+                    <span data-norm="en1992" data-i18n="label.gamma_s.en1992">γ_s</span>
                     <input type="text" inputmode="decimal" id="gamma_s" value=""></label>
 
                 <div data-norm="en1992">

@@ -86,7 +86,13 @@ test('i18n: every key used in the page and in the code exists', () => {
                          'gamma_c', 'gamma_s', 'gamma_d', 'alpha_cc',
                          'alpha_cc_pl']) {
         assert.ok(keys.has('name.' + field), field);
-        assert.ok(keys.has('label.' + field), field);
+        if (field === 'gamma_c' || field === 'gamma_s') {
+            // these two have the term of each norm
+            assert.ok(keys.has('label.' + field + '.sia262'), field);
+            assert.ok(keys.has('label.' + field + '.en1992'), field);
+        } else {
+            assert.ok(keys.has('label.' + field), field);
+        }
     }
     for (const norm of [en1992, sia262]) {
         assert.ok(keys.has(norm.label), norm.label);
