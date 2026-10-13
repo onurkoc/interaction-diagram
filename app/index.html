@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>M-N-Interaktionsdiagramm</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- landing page: the norm has to be chosen first -->
+<main id="landing">
+    <h1>M-N-Interaktionsdiagramm</h1>
+    <p>Querschnittsnachweis für Stahlbeton-Rechteckquerschnitte
+        (Spritzbetonschalen) mit CULT-I. Nicht für Druckglieder mit
+        Effekten 2. Ordnung.</p>
+    <h2>Norm wählen</h2>
+    <nav class="norms">
+        <a class="norm" href="#sia262">
+            <strong>SIA 262:2025</strong>
+            <span>f_cd mit η_fc und η_t, keine Mindestausmitte</span>
+        </a>
+        <a class="norm" href="#en1992">
+            <strong>EN 1992-1-1</strong>
+            <span>ohne Nationalen Anhang (empfohlene Werte)</span>
+        </a>
+    </nav>
+    <noscript><p class="error">Diese Seite braucht JavaScript.</p></noscript>
+</main>
+
+<!-- calculator -->
+<main id="calculator" hidden>
+    <header>
+        <h1>M-N-Interaktionsdiagramm</h1>
+        <p><strong id="norm-name"></strong>
+            <a href="#">Norm wechseln</a></p>
+    </header>
+
+    <section id="drop-zone">
+        <label for="file">Excel-Datei mit den Lastpunkten hierher ziehen
+            oder auswählen:</label>
+        <input type="file" id="file" accept=".xlsx">
+        <button type="button" id="remove-file">Lastpunkte entfernen</button>
+        <p class="small">Spalten <code>N [kN]</code> und <code>M [kNm]</code>
+            (charakteristische Werte) oder Tabelle einer Platte aus Plaxis 2D
+            mit <code>N [kN/m]</code> und <code>M [kN m/m]</code>.
+            Die Datei wird nur im Browser gelesen und nicht übertragen.</p>
+        <p id="file-message"></p>
+    </section>
+
+    <div class="layout">
+        <form id="inputs" autocomplete="off">
+            <fieldset>
+                <legend>Querschnitt</legend>
+                <label>Höhe h [m]
+                    <input type="text" inputmode="decimal" id="h_" value="0.35"></label>
+                <label>Breite b [m]
+                    <input type="text" inputmode="decimal" id="b_" value="1.0"></label>
+                <label>Bewehrung a_s1 [cm²]
+                    <input type="text" inputmode="decimal" id="a_s1" value="2.58"></label>
+                <label>Achsabstand d_1 von a_s1 [m]
+                    <input type="text" inputmode="decimal" id="d_1" value="0.03"></label>
+                <label>Bewehrung a_s2 [cm²]
+                    <input type="text" inputmode="decimal" id="a_s2" value="2.58"></label>
+                <label>Achsabstand d_2 von a_s2 [m]
+                    <input type="text" inputmode="decimal" id="d_2" value="0.03"></label>
+                <p class="small">Positives Moment: Zug auf der Seite von
+                    a_s1.</p>
+            </fieldset>
+
+            <fieldset>
+                <legend>Baustoffe</legend>
+                <label>Beton f_ck [N/mm²] (bis 50)
+                    <input type="text" inputmode="decimal" id="f_ck" value="20"></label>
+                <label>Betonstahl f_yk [N/mm²]
+                    <input type="text" inputmode="decimal" id="f_yk" value="550"></label>
+                <label>γ_c
+                    <input type="text" inputmode="decimal" id="gamma_c" value=""></label>
+                <label>γ_s
+                    <input type="text" inputmode="decimal" id="gamma_s" value=""></label>
+
+                <div data-norm="en1992">
+                    <label>α_cc (0,8 bis 1,0)
+                        <input type="text" inputmode="decimal" id="alpha_cc" value=""></label>
+                    <label>α_cc,pl (nur unbewehrt, a_s1 = a_s2 = 0)
+                        <input type="text" inputmode="decimal" id="alpha_cc_pl" value=""></label>
+                    <label class="check">
+                        <input type="checkbox" id="eccentricity">
+                        Mindestausmitte e0 = max(h/30; 20 mm) auf die
+                        Lastpunkte anwenden (6.1 (4))</label>
+                </div>
+
+                <div data-norm="sia262">
+                    <div id="eta_t" class="choice">
+                        <span>η_t (4.2.1.3), bitte wählen:</span>
+                        <label class="check">
+                            <input type="radio" name="eta_t" value="1.0"> 1,0</label>
+                        <label class="check">
+                            <input type="radio" name="eta_t" value="0.85"> 0,85</label>
+                        <label class="check">
+                            <input type="radio" name="eta_t" value="1.2"> 1,2</label>
+                        <p class="small">Vorschlag 0,85: Spritzbeton wird
+                            meist früh belastet. 1,2 nur bei stossartiger
+                            Belastung.</p>
+                    </div>
+                </div>
+            </fieldset>
+
+            <fieldset>
+                <legend>Lastpunkte</legend>
+                <label>Lastfaktor γ_d (1,0, wenn Bemessungswerte importiert
+                    werden)
+                    <input type="text" inputmode="decimal" id="gamma_d" value=""></label>
+                <label class="check">
+                    <input type="checkbox" id="cult" checked>
+                    CULT-I berechnen</label>
+            </fieldset>
+        </form>
+
+        <section id="output">
+            <div id="messages" class="error" hidden></div>
+            <div id="diagram"></div>
+            <ul id="hints" class="small"></ul>
+        </section>
+    </div>
+
+    <section>
+        <p id="summary"></p>
+        <div id="table"></div>
+    </section>
+
+    <footer class="small">
+        <a href="https://github.com/onurkoc/interaction-diagram">Quellcode</a>
+    </footer>
+</main>
+
+<!-- libraries, stored locally (no CDN) -->
+<script src="vendor/plotly-basic.min.js"></script>
+<script type="module">
+    import * as XLSX from './vendor/xlsx.mjs';
+    import { start } from './app.js';
+    // plotly-basic.min.js is a classic script and sets window.Plotly
+    start({ XLSX: XLSX, Plotly: window.Plotly });
+</script>
+</body>
+</html>
