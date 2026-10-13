@@ -78,6 +78,19 @@ function rel_max(limit_x, limit_y, m_extreme) {
 }
 
 /**
+ * Equation (4) of the paper
+ * @param {number} m_rel_i
+ * @param {number} n_rel_i
+ * @param {number} m_rel_max
+ * @param {number} n_rel_max
+ * @returns {number}
+ */
+function index(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
+    return Math.sqrt((m_rel_i * m_rel_i + n_rel_i * n_rel_i) / (
+        m_rel_max * m_rel_max + n_rel_max * n_rel_max));
+}
+
+/**
  * capacity utilization of linings in tunnels (CULT-I)
  * according to the paper:
  * Performance indicator of tunnel linings under geotechnical uncertainty;
@@ -90,6 +103,7 @@ function rel_max(limit_x, limit_y, m_extreme) {
  * moment): M_rel,max is the largest moment, N_rel,max the distance from
  * its normal force to the end of the curve on the compression side.
  * Both are taken from the side of the curve with the sign of m.
+ * For m = 0 both sides are checked, the smaller result governs.
  * @param {number} m  x coordinate of a point, moment
  * @param {number} n  y coordinate of a point, normal force
  * @param {InputValues} input_values  input values from int_diagram
@@ -108,15 +122,10 @@ export function cult_I(m, n, input_values, values) {
     // Reference values of the side of the point. The paper shows a
     // symmetric curve; a side of its own for each sign of the moment is
     // an extension for unsymmetric reinforcement (see NOTES.md).
-    // m = 0: positive side.
-    let m_rel_max, n_rel_max;
-    if (m >= 0) {
-        [m_rel_max, n_rel_max] = rel_max(limit_x_pos, limit_y,
-                                         max(limit_x_pos));
-    } else {
-        [m_rel_max, n_rel_max] = rel_max(limit_x_neg, limit_y_neg,
-                                         min(limit_x_neg));
-    }
+    const [m_rel_max_pos, n_rel_max_pos] = rel_max(limit_x_pos, limit_y,
+                                                   max(limit_x_pos));
+    const [m_rel_max_neg, n_rel_max_neg] = rel_max(limit_x_neg, limit_y_neg,
+                                                   min(limit_x_neg));
 
     const horizontal_cut_x = [min(limit_x_neg),
                               max(limit_x_pos)];
@@ -138,51 +147,70 @@ export function cult_I(m, n, input_values, values) {
                                     limit_y_neg);
     const y2 = y2_pos.concat(y2_neg);
 
-    let m_rel_i, n_rel_i;
-    if (m > 0) {
-        const [x1] = intersection(horizontal_cut_x,
+    // moments of the curve for the normal force n, for each side
+    const [x1_pos] = intersection(horizontal_cut_x,
                                   horizontal_cut_y,
                                   limit_x_pos,
                                   limit_y);
-        if (x1.length === 0 || y2.length === 0) {
+    const [x1_neg] = intersection(horizontal_cut_x,
+                                  horizontal_cut_y,
+                                  limit_x_neg,
+                                  limit_y_neg);
+
+    if (m > 0) {
+        if (x1_pos.length === 0 || y2.length === 0) {
             return 'outside';
         }
         // several intersection points (e.g. the cut goes through a point
         // of the curve): the outermost one is the limit
-        m_rel_i = max(x1) - m;
+        const m_rel_i = max(x1_pos) - m;
         // The nearest of all intersection points. The paper shows N_rel,i
         // only for a point on the compression side of the centre, towards
         // the compression end (assumption, see NOTES.md).
-        n_rel_i = min(y2.map(y => Math.abs(y - n)));
+        const n_rel_i = min(y2.map(y => Math.abs(y - n)));
         if (m_rel_i < 0) {
             return 'outside';
         }
+        return round3(index(m_rel_i, n_rel_i, m_rel_max_pos, n_rel_max_pos));
     } else if (m === 0) {
-        m_rel_i = m_rel_max;
-        n_rel_i = distance_to_ends(n, limit_y);
         if (n > max(limit_y) || n < min(limit_y)) {
             // beyond pure tension or beyond centric compression
             return 'outside';
         }
+        if (x1_pos.length === 0 || x1_neg.length === 0) {
+            return 'outside';
+        }
+        // M_rel,i is the moment of the curve for the normal force n,
+        // towards each side
+        const m_rel_i_pos = max(x1_pos);
+        const m_rel_i_neg = -min(x1_neg);
+        if (m_rel_i_pos < 0 || m_rel_i_neg < 0) {
+            // ends of the curve of an unsymmetric section: M = 0 is not
+            // between the two sides
+            return 'outside';
+        }
+        // The nearest point of the curve in the direction of N. For a
+        // symmetric section these are the ends of the curve; there the cut
+        // only touches the curve, so the ends are added.
+        const n_rel_i = min(y2.map(y => Math.abs(y - n)).concat(
+            [distance_to_ends(n, limit_y)]));
+        // both sides, the smaller result governs
+        return round3(Math.min(
+            index(m_rel_i_pos, n_rel_i, m_rel_max_pos, n_rel_max_pos),
+            index(m_rel_i_neg, n_rel_i, m_rel_max_neg, n_rel_max_neg)));
     } else {
-        const [x1] = intersection(horizontal_cut_x,
-                                  horizontal_cut_y,
-                                  limit_x_neg,
-                                  limit_y_neg);
-        if (x1.length === 0 || y2.length === 0) {
+        if (x1_neg.length === 0 || y2.length === 0) {
             return 'outside';
         }
         // several intersection points: the outermost one is the limit
-        m_rel_i = min(x1) - m;
+        const m_rel_i = min(x1_neg) - m;
         // the nearest of all intersection points, as on the positive side
-        n_rel_i = min(y2.map(y => Math.abs(y - n)));
+        const n_rel_i = min(y2.map(y => Math.abs(y - n)));
         if (m_rel_i > 0) {
             return 'outside';
         }
+        return round3(index(m_rel_i, n_rel_i, m_rel_max_neg, n_rel_max_neg));
     }
-    const cult_I = Math.sqrt((m_rel_i * m_rel_i + n_rel_i * n_rel_i) / (
-        m_rel_max * m_rel_max + n_rel_max * n_rel_max));
-    return round3(cult_I);
 }
 
 /**
