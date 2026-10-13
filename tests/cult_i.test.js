@@ -46,9 +46,9 @@ test('cult_I_details: CULT-I follows from the intermediate values', () => {
         if (d === 'outside') {
             continue;
         }
-        // equation (4) of the paper, rounded to three decimals
-        const index = Math.sqrt((d.m_rel_i ** 2 + d.n_rel_i ** 2) /
-                                (d.m_rel_max ** 2 + d.n_rel_max ** 2));
+        // normalised form (N13), rounded to three decimals
+        const index = Math.sqrt((d.n_rel_i / d.n_rel_max) ** 2 +
+                                (d.m_rel_i / d.m_rel_max) ** 2) / Math.SQRT2;
         assert.ok(Math.abs(d.cult_I - index) <= 0.0005);
         assert.ok(d.m_rel_i >= 0 && d.n_rel_i >= 0);
         // the same number as cult_I
