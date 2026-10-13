@@ -130,7 +130,35 @@ For both kinds:
   rejected.
 - The values may be characteristic or design values, see the load factor.
 
-## CULT-I
+## Radial utilization
+
+For every load point the app shows whether it is inside or outside of the
+capacity curve. Two more values can be switched on and off below the
+load factor: the radial utilization (on by default) and CULT-I (off by
+default).
+
+The radial utilization is
+
+$$
+\text{utilization} = \frac{|S_d|}{|R_d|}
+$$
+
+S_d is the load point (M_Ed, N_Ed). R_d is the point of the capacity curve
+on the ray from the origin through the load point.
+
+- 1 means the point is on the curve, a value above 1 that it is outside.
+  The value is not capped.
+- **Assumption: N and M grow in proportion.** If only one of them can grow
+  (e.g. the moment at a constant normal force), the reserve is a
+  different one.
+- With the minimum eccentricity (EN mode) the value belongs to the checked
+  point with M_Ed,mod, like CULT-I.
+- **Plain concrete (a_s1 = a_s2 = 0): not defined.** The curve ends at the
+  origin, so there is no ray through the inside of it. The app then shows
+  no number, only a hint. The same holds whenever the origin is not
+  inside of the curve.
+
+## CULT-I (optional)
 
 CULT-I (index for the capacity utilization of linings in tunnels) comes
 from this paper:
@@ -236,6 +264,7 @@ app/                the static app
   core.js           capacity curves
   strain_planes.js  strain planes (pivot points A, B, C)
   cult_i.js         CULT-I
+  utilization.js    radial utilization
   intersection.js   intersection of two curves
   xls_read.js       reading the Excel file
   loads.js          width and load factor
