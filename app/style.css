@@ -254,10 +254,6 @@ fieldset p {
     height: 720px;
 }
 
-#diagram:empty {
-    height: 0;
-}
-
 #hints {
     padding-left: 20px;
 }
