@@ -157,38 +157,38 @@ export function cult_I(m, n, input_values, values) {
                                   limit_x_neg,
                                   limit_y_neg);
 
+    // Inside: for the normal force n the moment is between the moments of
+    // the two sides. Several intersection points (e.g. the cut goes through
+    // a point of the curve): the outermost one is the limit.
+    // With unsymmetric reinforcement the ends of the curve are not at
+    // M = 0, so near the ends a small moment can be outside of the other
+    // side (N12 in NOTES.md).
+    if (n > max(limit_y) || n < min(limit_y)) {
+        // beyond pure tension or beyond centric compression
+        return 'outside';
+    }
+    if (x1_pos.length === 0 || x1_neg.length === 0) {
+        return 'outside';
+    }
+    if (m < min(x1_neg) || m > max(x1_pos)) {
+        return 'outside';
+    }
+
     if (m > 0) {
-        if (x1_pos.length === 0 || y2.length === 0) {
+        if (y2.length === 0) {
             return 'outside';
         }
-        // several intersection points (e.g. the cut goes through a point
-        // of the curve): the outermost one is the limit
         const m_rel_i = max(x1_pos) - m;
         // The nearest of all intersection points. The paper shows N_rel,i
         // only for a point on the compression side of the centre, towards
         // the compression end (assumption, see NOTES.md).
         const n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        if (m_rel_i < 0) {
-            return 'outside';
-        }
         return round3(index(m_rel_i, n_rel_i, m_rel_max_pos, n_rel_max_pos));
     } else if (m === 0) {
-        if (n > max(limit_y) || n < min(limit_y)) {
-            // beyond pure tension or beyond centric compression
-            return 'outside';
-        }
-        if (x1_pos.length === 0 || x1_neg.length === 0) {
-            return 'outside';
-        }
         // M_rel,i is the moment of the curve for the normal force n,
         // towards each side
         const m_rel_i_pos = max(x1_pos);
         const m_rel_i_neg = -min(x1_neg);
-        if (m_rel_i_pos < 0 || m_rel_i_neg < 0) {
-            // ends of the curve of an unsymmetric section: M = 0 is not
-            // between the two sides
-            return 'outside';
-        }
         // The nearest point of the curve in the direction of N. For a
         // symmetric section these are the ends of the curve; there the cut
         // only touches the curve, so the ends are added.
@@ -199,16 +199,12 @@ export function cult_I(m, n, input_values, values) {
             index(m_rel_i_pos, n_rel_i, m_rel_max_pos, n_rel_max_pos),
             index(m_rel_i_neg, n_rel_i, m_rel_max_neg, n_rel_max_neg)));
     } else {
-        if (x1_neg.length === 0 || y2.length === 0) {
+        if (y2.length === 0) {
             return 'outside';
         }
-        // several intersection points: the outermost one is the limit
         const m_rel_i = min(x1_neg) - m;
         // the nearest of all intersection points, as on the positive side
         const n_rel_i = min(y2.map(y => Math.abs(y - n)));
-        if (m_rel_i > 0) {
-            return 'outside';
-        }
         return round3(index(m_rel_i, n_rel_i, m_rel_max_neg, n_rel_max_neg));
     }
 }
