@@ -28,6 +28,7 @@ export const TEXTS = {
         'norm.en1992.label': 'EN 1992-1-1 ohne Nationalen Anhang (empfohlene Werte)',
         'header.change_norm': 'Norm wechseln',
         'footer.source': 'Quellcode',
+        'validation.note': 'Stand der Validierung: Die Kurve mit Bewehrung ist mit commercial program verglichen, nur für SIA 262 und symmetrische Bewehrung (ein Querschnitt). EN 1992-1-1, unsymmetrische Bewehrung, unbewehrter Querschnitt, Ausnutzung radial und CULT-I sind nur durch Regel-Tests gedeckt.',
 
         // file
         'file.label': 'Excel-Datei mit den Lastpunkten hierher ziehen oder auswählen:',
@@ -207,6 +208,7 @@ export const TEXTS = {
         'norm.en1992.label': 'EN 1992-1-1 without National Annex (recommended values)',
         'header.change_norm': 'Change code',
         'footer.source': 'Source code',
+        'validation.note': 'Validation status: the curve with reinforcement was compared with commercial program, for SIA 262 and symmetric reinforcement only (one cross-section). EN 1992-1-1, asymmetric reinforcement, plain concrete, radial utilization and CULT-I are covered by rule tests only.',
 
         // file
         'file.label': 'Drop the Excel file with the load points here or choose it:',
