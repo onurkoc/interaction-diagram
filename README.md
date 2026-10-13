@@ -74,10 +74,11 @@ output follows the language: a decimal comma in German, a decimal point in
 English. A number is written again with that sign when the field is left;
 its value and its digits do not change. Forces are shown in kN and kNm.
 
-The button «Beispiel laden» / «Load example» fills in example values. As
-long as cross-section and materials are exactly these values, the diagram
-is marked «Beispielwerte, nicht projektbezogen» / «Example values, not
-from a project».
+The button «Beispiel laden» / «Load example» fills in example values. The
+diagram is then marked «Beispielwerte, nicht projektbezogen» / «Example
+values, not from a project», until a field of the cross-section or of the
+materials is changed or the example is undone. Values that are typed are
+never marked, even if they equal the example.
 
 ### Sign convention
 

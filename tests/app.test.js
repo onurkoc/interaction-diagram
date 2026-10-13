@@ -12,7 +12,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
          summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE,
-         is_example, has_inputs, message_text, error_text }
+         NO_EXAMPLE, example_loaded, example_edited, example_undone,
+         SECTION_FIELDS, has_inputs, message_text, error_text }
     from '../app/app.js';
 import { figure, min_cult_I, max_utilization } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
@@ -300,22 +301,58 @@ test('EXAMPLE: the values of the button give a calculation in both norms', () =>
     }
 });
 
-test('is_example: the result is marked as long as the values are the example', () => {
-    // case 1: cross-section and materials are exactly the example values
-    const example = /** @type {any} */ ({ ...raw(), ...EXAMPLE });
-    assert.equal(is_example(example), true);
-    // the number counts, not the way it is written
-    assert.equal(is_example({ ...example, h_: '0,350', b_: '1' }), true);
-    // load factor, eta_t and the partial factors are not part of it
-    assert.equal(is_example({ ...example, gamma_d: '1,35', eta_t: '1.0',
-                              gamma_c: '1.2' }), true);
-    // case 2: one value changed, or a field emptied: not the example
-    for (const field of ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk']) {
-        assert.equal(is_example({ ...example, [field]: '9' }), false, field);
-        assert.equal(is_example({ ...example, [field]: '' }), false, field);
+test('example mark: it follows where the values come from, not the values', () => {
+    const typed = raw();
+    const empty = /** @type {any} */ ({
+        ...raw(), h_: '', b_: '', a_s1: '', d_1: '', a_s2: '', d_2: '',
+        f_ck: '', f_yk: '', eta_t: '', gamma_d: '' });
+    assert.deepEqual(NO_EXAMPLE, { marked: false, before: null });
+
+    // case 1: «Beispiel laden» sets the mark; the input before it is kept
+    // for undo, if there was any
+    assert.deepEqual(example_loaded(NO_EXAMPLE, typed),
+                     { marked: true, before: typed });
+    assert.deepEqual(example_loaded(NO_EXAMPLE, empty),
+                     { marked: true, before: null });
+    // loaded twice: undo still leads to the input of the user
+    const twice = example_loaded(example_loaded(NO_EXAMPLE, typed),
+                                 /** @type {any} */ ({ ...typed, ...EXAMPLE }));
+    assert.deepEqual(twice, { marked: true, before: typed });
+
+    // case 2: a change of any field of the cross-section or of the
+    // materials ends the mark, and the offer to undo
+    assert.deepEqual(SECTION_FIELDS, [
+        'h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk',
+        'gamma_c', 'gamma_s', 'alpha_cc', 'alpha_cc_pl', 'eta_t']);
+    const loaded = example_loaded(NO_EXAMPLE, typed);
+    for (const field of SECTION_FIELDS) {
+        assert.deepEqual(example_edited(loaded, field),
+                         { marked: false, before: null }, field);
+    }
+    // the load factor and the switches of the output are not part of it:
+    // the mark stays, only the offer to undo ends
+    for (const field of ['gamma_d', 'radial', 'cult', 'eccentricity']) {
+        assert.deepEqual(example_edited(loaded, field),
+                         { marked: true, before: null }, field);
     }
 
+    // case 3: undo gives back the input before the example, without mark
+    assert.equal(loaded.before, typed);
+    assert.deepEqual(example_undone(loaded), { marked: false, before: null });
+
+    // case 4: typed values are never marked. No change of a field sets
+    // the mark, and the state does not depend on the values at all.
+    for (const field of [...SECTION_FIELDS, 'gamma_d', 'radial', 'cult']) {
+        assert.equal(example_edited(NO_EXAMPLE, field).marked, false, field);
+    }
+    // after the mark has ended, typing the example values back does not
+    // bring it again
+    let state = example_edited(loaded, 'h_');
+    state = example_edited(state, 'h_');
+    assert.equal(state.marked, false);
+
     // the figure names the example in the legend, and only then
+    const example = /** @type {any} */ ({ ...raw(), ...EXAMPLE });
     const { params } = check_inputs(example, en1992);
     const result = calculate(params, en1992, null, { radial: true });
     for (const lang of LANGUAGES) {

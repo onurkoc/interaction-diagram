@@ -88,8 +88,11 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
 // all inputs that are typed as text
 const TEXT_FIELDS = ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2', 'f_ck', 'f_yk',
                      'gamma_c', 'gamma_s', 'gamma_d', 'alpha_cc', 'alpha_cc_pl'];
-// the inputs of the cross-section and of the materials
-const SECTION_FIELDS = ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2', 'f_ck', 'f_yk'];
+// the inputs of the cross-section and of the materials (the first two
+// groups of the form); a change of one of them ends the example
+export const SECTION_FIELDS = ['h_', 'b_', 'a_s1', 'd_1', 'a_s2', 'd_2',
+                               'f_ck', 'f_yk', 'gamma_c', 'gamma_s',
+                               'alpha_cc', 'alpha_cc_pl', 'eta_t'];
 
 // numbers inside the fixed texts of the page: [number, digits]
 const TEXT_PARAMS = /** @type {Object<string, Object<string, any>>} */ ({
@@ -141,16 +144,53 @@ export const EXAMPLE = /** @type {Object<string, string>} */ ({
 });
 
 /**
- * Are the cross-section and the materials exactly the example values?
- * Then the result is marked as an example, not as values of a project.
- * The numbers are compared, not the text ("0,35" is "0.35").
- * @param {RawInputs} raw
- * @returns {boolean}
+ * Where the input comes from. The result is marked as an example only
+ * if the button «Beispiel laden» wrote the values; the values themselves
+ * are never compared. Typed values are never marked, whatever they are.
+ * @typedef {Object} ExampleState
+ * @property {boolean} marked  the values were written by the button
+ * @property {RawInputs | null} before  the input before the button was
+ *     used, null: nothing to undo
  */
-export function is_example(raw) {
-    const fields = /** @type {Object<string, any>} */ (raw);
-    return SECTION_FIELDS.every(
-        field => parse_number(fields[field]) === parse_number(EXAMPLE[field]));
+
+/** State at the start: nothing loaded, nothing to undo. */
+export const NO_EXAMPLE = /** @type {ExampleState} */ (
+    Object.freeze({ marked: false, before: null }));
+
+/**
+ * The button «Beispiel laden» was used: the result is marked.
+ * @param {ExampleState} state
+ * @param {RawInputs} raw  the input before the example is written
+ * @returns {ExampleState}
+ */
+export function example_loaded(state, raw) {
+    if (state.marked) {
+        // loaded a second time: undo still leads to the input of the user
+        return { marked: true, before: state.before };
+    }
+    return { marked: true, before: has_inputs(raw) ? raw : null };
+}
+
+/**
+ * The user changed an input. A change of the cross-section or of the
+ * materials ends the mark; any change ends the offer to undo.
+ * @param {ExampleState} state
+ * @param {string} field  name of the input
+ * @returns {ExampleState}
+ */
+export function example_edited(state, field) {
+    return { marked: state.marked && !SECTION_FIELDS.includes(field),
+             before: null };
+}
+
+/**
+ * «Rückgängig» was used: the input before the example is back (the page
+ * writes state.before into the fields), without the mark.
+ * @param {ExampleState} state
+ * @returns {ExampleState}
+ */
+export function example_undone(state) {
+    return NO_EXAMPLE;
 }
 
 /**
@@ -721,9 +761,9 @@ export function start({ XLSX, Plotly }) {
     }
     let t = translator(first_language());
 
-    // the input before the example was loaded, null: nothing to undo
-    /** @type {RawInputs | null} */
-    let before_example = null;
+    // were the values written by «Beispiel laden», and what was there before
+    /** @type {ExampleState} */
+    let example_state = NO_EXAMPLE;
     // names of the inputs the user has left
     /** @type {Set<string>} */
     const touched = new Set();
@@ -900,7 +940,7 @@ export function start({ XLSX, Plotly }) {
         }
         const narrow = window.innerWidth < 700;
         // example values are marked above the diagram and in the legend
-        const example = is_example(raw);
+        const example = example_state.marked;
         example_note.hidden = !example;
         const fig = figure(result.input_values, result.values, norm,
                            result.points, t,
@@ -1023,7 +1063,15 @@ export function start({ XLSX, Plotly }) {
         });
     }
 
-    form.addEventListener('input', update);
+    form.addEventListener('input', event => {
+        // a change by the user: the values are no longer (only) the
+        // example, and the offer to undo it ends
+        const target = /** @type {HTMLInputElement} */ (event.target);
+        example_state = example_edited(
+            example_state, (target.type === 'radio') ? target.name : target.id);
+        example_undo.hidden = true;
+        update();
+    });
     form.addEventListener('submit', event => event.preventDefault());
     form.addEventListener('focusout', event => {
         const target = /** @type {HTMLInputElement} */ (event.target);
@@ -1038,17 +1086,12 @@ export function start({ XLSX, Plotly }) {
         }
         update();
     });
-    // a change by the user ends the offer to undo the example
-    form.addEventListener('input', () => {
-        before_example = null;
-        example_undo.hidden = true;
-    });
     element('undo').addEventListener('click', () => {
-        if (before_example === null) {
+        if (example_state.before === null) {
             return;
         }
         // all fields as they were, also eta_t and gamma_d
-        const fields = /** @type {Object<string, any>} */ (before_example);
+        const fields = /** @type {Object<string, any>} */ (example_state.before);
         for (const field of TEXT_FIELDS) {
             input(field).value = fields[field];
         }
@@ -1056,16 +1099,15 @@ export function start({ XLSX, Plotly }) {
             /** @type {HTMLInputElement} */ (radio).checked =
                 /** @type {HTMLInputElement} */ (radio).value === fields['eta_t'];
         }
-        before_example = null;
+        example_state = example_undone(example_state);
         example_undo.hidden = true;
         update();
     });
     element('example').addEventListener('click', () => {
         // filled in at once, without a question; if there was input
         // before, it can be brought back
-        const before = raw_inputs();
-        before_example = has_inputs(before) ? before : null;
-        example_undo.hidden = before_example === null;
+        example_state = example_loaded(example_state, raw_inputs());
+        example_undo.hidden = example_state.before === null;
         // the values are written into the fields, visible to the user
         for (const [field, value] of Object.entries(EXAMPLE)) {
             if (field === 'eta_t') {
