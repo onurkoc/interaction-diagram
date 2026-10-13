@@ -113,7 +113,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | N9 | umgesetzt: Abstand zu den Enden der Kurve = min(n − N_min; N_max − n) |
 | N10 | offen: CULT-I-Definition (N_rel,max, Richtung von N_rel,i) nicht am Original geprüft; Code unverändert |
 | N5, N6 | offen, mit der Oberfläche |
-| N8 | umgesetzt für Excel: Spaltenköpfe «n» und «m» werden exakt erkannt (optional mit Einheit in eckigen Klammern); Plaxis folgt |
+| N8 | umgesetzt für Excel und Plaxis 2D: Spaltenköpfe «n» und «m» werden exakt erkannt (optional mit Einheit in eckigen Klammern). Die Einheit entscheidet über die Art der Tabelle: ohne Einheit, [kN], [kNm] = Schnittgrössen des Querschnitts; [kN/m], [kNm/m] = Plaxis, pro Meter. Unbekannte oder gemischte Einheiten werden abgelehnt (vorher wurde [kN/m] still als [kN] gelesen). Entscheide Onur (2026-10-13) für Plaxis: Spalten N und M der Phase, nicht die Umhüllenden N_min/N_max/M_min/M_max; Umrechnung mit der Querschnittsbreite (Wert · b, `section_forces` in `loads.js`); Vorzeichen von M wie in der Datei, N negativ = Druck; alle Zeilen werden gelesen, auch Knoten, die zu zwei Elementen gehören. |
 | E4 | bleibt (D3) |
 
 ## 6 Tests und Referenzen
