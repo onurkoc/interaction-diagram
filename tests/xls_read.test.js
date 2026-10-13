@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from '../app/vendor/xlsx.mjs';
 import { column_head, read_rows, read } from '../app/xls_read.js';
-import { design_values, section_forces } from '../app/loads.js';
+import { design_values, section_forces, load_points } from '../app/loads.js';
 
 /**
  * Content of an .xlsx file with one sheet.
@@ -170,6 +170,38 @@ test('loads: forces per metre are multiplied by the width', () => {
     assert.throws(() => section_forces([10], [-100], 0), /Breite/);
     assert.throws(() => section_forces([10], [-100], -1), /Breite/);
     assert.throws(() => section_forces([10], [-100], NaN), /Breite/);
+});
+
+test('loads: whole chain from the file to the load points, width not 1 m', () => {
+    const b_ = 0.5;
+    const gamma_d = 1.35;
+
+    // Plaxis 2D, per metre: gamma_d * (value * b) / 1000
+    const plaxis = xlsx_file([
+        ['              N [kN/m]', '            M [kN m/m]'],
+        [-400, -20],
+        [-390.5, 15],
+    ]);
+    let [x, y, per_metre] = read(plaxis, XLSX);
+    let [m, n] = load_points(x, y, per_metre, b_, gamma_d);
+    assert.deepEqual(m, [gamma_d * (-20 * b_) / 1000,
+                         gamma_d * (15 * b_) / 1000]);
+    assert.deepEqual(n, [gamma_d * (-400 * b_) / 1000,
+                         gamma_d * (-390.5 * b_) / 1000]);
+
+    // simple list, forces of the cross-section: the width is not applied
+    const list = xlsx_file([
+        ['N [kN]', 'M [kNm]'],
+        [-400, -20],
+        [-390.5, 15],
+    ]);
+    [x, y, per_metre] = read(list, XLSX);
+    [m, n] = load_points(x, y, per_metre, b_, gamma_d);
+    assert.deepEqual(m, [gamma_d * -20 / 1000, gamma_d * 15 / 1000]);
+    assert.deepEqual(n, [gamma_d * -400 / 1000, gamma_d * -390.5 / 1000]);
+
+    // the width is checked only where it is used
+    assert.throws(() => load_points([10], [-100], true, 0, gamma_d), /Breite/);
 });
 
 test('loads: design values are gamma_d * value / 1000', () => {
