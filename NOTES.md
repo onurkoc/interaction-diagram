@@ -126,6 +126,12 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
   rechnet (a_s1 = a_s2 > 0, d_1 = d_2, α_cc ≥ 0,85). Der Vergleich läuft
   mit dem alten Dehnungsarray als Option. Die Parametersätze zu den
   bekannten Fehlern (E5, E10, N1, N2) sind nach den Korrekturen entfernt.
+  Für CULT-I gibt es seit N10 keinen Vergleich mit der Python-Referenz
+  mehr (`tests/cult_i.test.js` entfernt): `legacy/cult_i.py` rechnet
+  N_rel,max anders als der Aufsatz. Die CULT-I-Werte in
+  `reference.json` bleiben als Stand des alten Codes stehen und werden
+  nicht mehr gelesen. CULT-I ist nur durch Regel-Tests gedeckt, ein
+  Zahlenvergleich mit einer unabhängigen Quelle fehlt.
 - **Regel-Tests** (`tests/corrections.test.js`): je Korrektur ein Test, der
   nur prüft, was direkt aus der Regel folgt. Keine von der App
   gerechneten Erwartungswerte.
