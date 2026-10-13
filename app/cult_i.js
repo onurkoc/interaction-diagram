@@ -64,11 +64,18 @@ function distance_to_ends(n, limit_y) {
  * capacity utilization of linings in tunnels (CULT-I)
  * according to the paper:
  * Performance indicator of tunnel linings under geotechnical uncertainty;
- * Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos
+ * Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos;
+ * Geomechanics and Tunnelling 9 (2016), No. 2, section 4, Fig. 2, eq. (4)
  * cult_I = sqrt( (N_rel,i^2 + M_rel,i^2) / (N_rel,max^2 + M_rel,max^2) )
+ * M_rel,i, N_rel,i: distances of the point to the curve in the direction
+ * of M and of N. M_rel,max, N_rel,max: the same distances of the point
+ * in the 'centre' of the curve (M = 0, normal force of the largest
+ * moment): M_rel,max is the largest moment, N_rel,max the distance from
+ * its normal force to the end of the curve on the compression side.
  * @param {number} m  x coordinate of a point, moment
  * @param {number} n  y coordinate of a point, normal force
  * @param {InputValues} input_values  input values from int_diagram
+ *     (not used any more, kept for the callers)
  * @param {Values} values  resulting values from int_diagram
  * @returns {number | 'outside'}
  */
@@ -80,13 +87,11 @@ export function cult_I(m, n, input_values, values) {
     const limit_x_neg = values['Moment Reinf Neg'];
     const limit_y_neg = values['Normal Force Reinf Neg'];
 
-    let n_rel_max;
-    if (input_values['a_s1'] === 0) {
-        n_rel_max = Math.abs(min(limit_y) - max(limit_y));
-    } else {
-        n_rel_max = Math.abs(min(limit_y) - max(limit_y)) / 2;  // take the half
-    }
     const m_rel_max = Math.abs(max(limit_x_pos));
+    // normal force of the largest moment (first point, if there are several)
+    const n_at_m_max = limit_y[limit_x_pos.indexOf(max(limit_x_pos))];
+    // compression is negative: the end on the compression side is the minimum
+    const n_rel_max = n_at_m_max - min(limit_y);
 
     const horizontal_cut_x = [min(limit_x_neg),
                               max(limit_x_pos)];
