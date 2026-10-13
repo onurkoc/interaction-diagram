@@ -6,7 +6,8 @@ Port of legacy/xls_read.py.
 Expected table (first sheet, first row = column heads):
     n   normal force, compression negative
     m   moment, sign as in the file
-Characteristic values; the load factor is applied in loads.js.
+Characteristic or design values, depending on the load factor that the
+user enters; it is applied in loads.js.
 
 Two kinds of tables are read, told apart by the unit in the column head:
     simple list     "n", "m" or "N [kN]", "M [kNm]"

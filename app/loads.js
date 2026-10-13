@@ -23,9 +23,9 @@ export function section_forces(x, y, b_) {
 /**
  * Design values of the load points for the diagram
  * (as in legacy/App.py: gamma_d * x / 1000).
- * @param {number[]} x  moments [kNm], characteristic
- * @param {number[]} y  normal forces [kN], characteristic
- * @param {number} gamma_d  load factor
+ * @param {number[]} x  moments [kNm], as read from the file
+ * @param {number[]} y  normal forces [kN], as read from the file
+ * @param {number} gamma_d  load factor (1.0 if the file has design values)
  * @returns {[number[], number[]]} moments [MNm], normal forces [MN]
  */
 export function design_values(x, y, gamma_d) {
