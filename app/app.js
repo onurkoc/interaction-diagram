@@ -258,14 +258,18 @@ export function calculate(params, norm, loads, with_cult) {
                     m: m[i], n: n[i],
                     m_mod: check.m_governing,
                     modified: modified,
+                    inside: check.details !== 'outside',
                     cult: with_cult ? check.details : null,
                 });
             } else {
+                // also without CULT-I: is the point inside of the curve?
+                const details = cult_I_details(m[i], n[i], values);
                 points.push({
                     m: m[i], n: n[i],
                     m_mod: m[i],
                     modified: false,
-                    cult: with_cult ? cult_I_details(m[i], n[i], values) : null,
+                    inside: details !== 'outside',
+                    cult: with_cult ? details : null,
                 });
             }
         }
