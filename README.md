@@ -42,7 +42,7 @@ not yet by a comparison with independent numbers.
 ## How to use it
 
 0. Open the app. Locally: double-click `start.cmd` (Windows, needs
-   Python 3) or run `npx http-server app`, see
+   Python 3) or run `npx http-server app -c-1`, see
    [Running it locally](#running-it-locally). A link to the app on the
    web follows.
 1. Choose the code on the first page. It can be changed at any time; the
@@ -235,16 +235,21 @@ Keep in mind:
 The folder `app/` is the complete app. It has to be opened through a web
 server; any static file server will do.
 
-On Windows, double-click `start.cmd`. It serves `app/` with Python 3 on
-<http://localhost:8000/> and opens the page. It uses Anaconda at
+On Windows, double-click `start.cmd`. It runs `serve.py`, a small server
+that uses only the standard library of Python 3: it serves `app/` on
+<http://localhost:8000/> and opens the page. `start.cmd` uses Anaconda at
 `C:\ProgramData\anaconda3` if it is there, otherwise the `python` of the
-PATH. Nothing is installed.
+PATH. Nothing is installed. On other systems: `python serve.py`.
 
-With Node.js:
+With Node.js (`-c-1` switches the cache off):
 
 ```sh
-npx http-server app
+npx http-server app -c-1
 ```
+
+Without a switched-off cache the browser may keep old files after an
+update; reload the page with Ctrl+F5 then. `serve.py` always sends
+`Cache-Control: no-store` and the right type for the JavaScript files.
 
 Opening `index.html` directly from the disk (`file://`) does not work,
 because browsers do not load JavaScript modules that way. The page then
@@ -270,7 +275,7 @@ app/                the static app
   loads.js          width and load factor
   norms/            configuration of SIA 262 and EN 1992-1-1
   vendor/           Plotly.js, SheetJS (with their licences)
-start.cmd           starts the app locally (Windows, Python 3)
+start.cmd, serve.py starts the app locally (Python 3)
 legacy/             the original Python code of 2020 (Dash), reference only
 tests/              tests, run with node
 NOTES.md            assumptions, findings and decisions (German)
