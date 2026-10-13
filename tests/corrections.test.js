@@ -13,6 +13,20 @@ import { sia262 } from '../app/norms/sia262.js';
 import { assertClose } from './helpers.js';
 
 /**
+ * CULT-I from its four distances, normalised form (N13 in NOTES.md):
+ * each distance divided by its reference value, then divided by sqrt(2).
+ * @param {number} m_rel_i
+ * @param {number} n_rel_i
+ * @param {number} m_rel_max
+ * @param {number} n_rel_max
+ * @returns {number}
+ */
+function normalised(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
+    return Math.sqrt((n_rel_i / n_rel_max) ** 2 + (m_rel_i / m_rel_max) ** 2) /
+        Math.SQRT2;
+}
+
+/**
  * @param {import('../app/core.js').InputParams} params
  * @param {import('../app/core.js').Norm} [norm]
  * @returns {any} values
@@ -272,7 +286,7 @@ test('N4: several intersection points do not raise an error', () => {
     // M_rel,max = 1, N_rel,max = 2 / 2 = 1
     // point (0.5, -1): M_rel,i = 1 - 0.5, N_rel,i = 0.5 (curve at m = 0.5
     // is at N = -1.5 and N = -0.5)
-    const expected = Math.sqrt((0.5 ** 2 + 0.5 ** 2) / (1 ** 2 + 1 ** 2));
+    const expected = normalised(0.5, 0.5, 1, 1);
     assert.equal(cult_I(0.5, -1, input_values, values), expected);
     assert.equal(cult_I(-0.5, -1, input_values, values), expected);
     // the corner itself is on the curve: M_rel,i = 0, N_rel,i = 0
@@ -297,7 +311,7 @@ test('N9: distance to the ends of the curve for m = 0', () => {
      * @param {number} n_rel_i
      */
     const expected = (m_rel_i, n_rel_i) =>
-        Math.sqrt((m_rel_i ** 2 + n_rel_i ** 2) / (1 ** 2 + 1.5 ** 2));
+        normalised(m_rel_i, n_rel_i, 1, 1.5);
 
     // n = -0.25: 1.75 to the compression end, 1.25 to the tension end;
     // curve between (1, -0.5) and (0, 1): M = 1 - 0.25 / 1.5
@@ -343,7 +357,7 @@ test('N10: N_rel,max is the distance from N at M_max to the compression end', ()
     const values = rhombus(-2, -1.5, 1);
     // point (0.5, -1.5): the curve is at M = 1 for this N, M_rel,i = 0.5;
     // for M = 0.5 the curve is at N = -1.75 and N = -0.25, N_rel,i = 0.25
-    const expected = Math.sqrt((0.5 ** 2 + 0.25 ** 2) / (1 ** 2 + 0.5 ** 2));
+    const expected = normalised(0.5, 0.25, 1, 0.5);
     for (const a_s1 of [0, 5]) {
         // no special rule for a_s1 = 0 any more
         const input_values = /** @type {any} */ ({ a_s1: a_s1, a_s2: 5 });
@@ -385,7 +399,7 @@ test('N10: N_rel,i is the distance to the nearest point of the closed curve', ()
     // For M = 0.125 the right side has no point at all (M >= 0.25); the
     // left side is at N = -1.9 and N = -0.1: N_rel,i = 0.15.
     // M_rel,max = 1, N_rel,max = -1 - (-2) = 1
-    const expected = Math.sqrt((0.3125 ** 2 + 0.15 ** 2) / (1 ** 2 + 1 ** 2));
+    const expected = normalised(0.3125, 0.15, 1, 1);
     const result = /** @type {number} */ (
         cult_I(0.125, -1.75, input_values, values));
     assert.ok(Math.abs(result - expected) <= 0.0005);
@@ -408,12 +422,12 @@ test('N10: M_rel,max and N_rel,max are taken from the side of the point', () => 
     // point (0.5, -1.5): M_rel,i = 0.5; curve for M = 0.5 at N = -1.75
     // and N = -0.75, N_rel,i = 0.25
     assert.equal(cult_I(0.5, -1.5, input_values, values),
-                 Math.sqrt((0.5 ** 2 + 0.25 ** 2) / (1 ** 2 + 0.5 ** 2)));
+                 normalised(0.5, 0.25, 1, 0.5));
 
     // left side: M_rel,max = 2, N_rel,max = 1.5
     // point (-1, -0.5): M_rel,i = 1; curve for M = -1 at N = -1.25 and
     // N = -0.25, N_rel,i = 0.25
-    const expected = Math.sqrt((1 ** 2 + 0.25 ** 2) / (2 ** 2 + 1.5 ** 2));
+    const expected = normalised(1, 0.25, 2, 1.5);
     const result = /** @type {number} */ (
         cult_I(-1, -0.5, input_values, values));
     assert.ok(Math.abs(result - expected) <= 0.0005);
@@ -582,4 +596,73 @@ test('N12: unsymmetric section, no jump of inside / outside at m = 0', () => {
             assert.equal(cult_I(-1e-9, n, input_values, values), 'outside');
         }
     }
+});
+
+test('N13: CULT-I does not depend on the units of M and N', () => {
+    // The same section and the same load points in other units: all
+    // moments times one factor, all normal forces times another one
+    // (e.g. MNm -> kNcm and MN -> kN). Equation (4) of the paper adds
+    // N^2 and M^2 and gives other values then; the normalised form
+    // gives the same.
+    /**
+     * @param {any} values
+     * @param {number} factor_m
+     * @param {number} factor_n
+     * @returns {any}
+     */
+    const scaled = (values, factor_m, factor_n) => {
+        /** @type {any} */
+        const result = {};
+        for (const key of Object.keys(values)) {
+            const factor = key.startsWith('Moment') ? factor_m : factor_n;
+            result[key] = values[key].map((/** @type {number} */ v) => v * factor);
+        }
+        return result;
+    };
+    for (const params of SYMMETRIC_SECTIONS.concat(UNSYMMETRIC_SECTIONS)) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        for (const [factor_m, factor_n] of [[100000, 1000], [1000, 1], [0.5, 8]]) {
+            const other = scaled(values, factor_m, factor_n);
+            for (const [m, n] of [[0.1, -2], [-0.1, -2], [0, -4], [0.3, -4],
+                                  [-0.2, -5], [0.05, -8], [0.02, -0.5]]) {
+                const a = cult_I(m, n, input_values, values);
+                const b = cult_I(m * factor_m, n * factor_n, input_values, other);
+                if (a === 'outside' || b === 'outside') {
+                    assert.equal(a, b, `m = ${m}, n = ${n}`);
+                    continue;
+                }
+                // rounded to three decimals: one step of tolerance
+                assert.ok(Math.abs(a - b) <= 0.001,
+                          `m = ${m}, n = ${n}, factors ${factor_m}, ${factor_n}: ` +
+                          `${a} != ${b}`);
+            }
+        }
+    }
+});
+
+test('N13: normalised form on a simple curve', () => {
+    // M_max = 4 at N = -30, compression end at N = -100, tension end at
+    // N = 10: M_rel,max = 4, N_rel,max = 70
+    const n = [-100, -30, 10];
+    const values = /** @type {any} */ ({
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0, 4, 0],
+        'Normal Force Reinf': n,
+        'Moment Reinf Neg': [0, -4, 0],
+        'Normal Force Reinf Neg': n,
+    });
+    const input_values = /** @type {any} */ ({ a_s1: 5, a_s2: 5 });
+    // point (1, -30): M_rel,i = 4 - 1 = 3; for M = 1 the curve is at
+    // N = -82.5 and N = 0, N_rel,i = 30
+    const expected = Math.sqrt((30 / 70) ** 2 + (3 / 4) ** 2) / Math.sqrt(2);
+    const result = /** @type {number} */ (cult_I(1, -30, input_values, values));
+    assert.ok(Math.abs(result - expected) <= 0.0005);
+    // not equation (4) of the paper, which would give another value here
+    const equation_4 = Math.sqrt((30 ** 2 + 3 ** 2) / (70 ** 2 + 4 ** 2));
+    assert.ok(Math.abs(result - equation_4) > 0.1);
+    // a point on the curve gives 0
+    assert.equal(cult_I(4, -30, input_values, values), 0);
 });

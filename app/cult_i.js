@@ -78,7 +78,14 @@ function rel_max(limit_x, limit_y, m_extreme) {
 }
 
 /**
- * Equation (4) of the paper
+ * The index from the four distances, in the normalised form (N13 in
+ * NOTES.md, decision of Onur Koc):
+ *     sqrt( (N_rel,i / N_rel,max)^2 + (M_rel,i / M_rel,max)^2 ) / sqrt(2)
+ * This deviates from equation (4) of the paper,
+ *     sqrt( (N_rel,i^2 + M_rel,i^2) / (N_rel,max^2 + M_rel,max^2) ),
+ * which adds forces and moments (e.g. kN^2 and kNm^2) and so depends on
+ * the units. Each distance is divided by its own reference value first;
+ * the centre of the curve still gives 1, a point on the curve 0.
  * @param {number} m_rel_i
  * @param {number} n_rel_i
  * @param {number} m_rel_max
@@ -86,8 +93,9 @@ function rel_max(limit_x, limit_y, m_extreme) {
  * @returns {number}
  */
 function index(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
-    return Math.sqrt((m_rel_i * m_rel_i + n_rel_i * n_rel_i) / (
-        m_rel_max * m_rel_max + n_rel_max * n_rel_max));
+    const m_ratio = m_rel_i / m_rel_max;
+    const n_ratio = n_rel_i / n_rel_max;
+    return Math.sqrt(n_ratio * n_ratio + m_ratio * m_ratio) / Math.SQRT2;
 }
 
 /**
@@ -96,7 +104,9 @@ function index(m_rel_i, n_rel_i, m_rel_max, n_rel_max) {
  * Performance indicator of tunnel linings under geotechnical uncertainty;
  * Spyridis, Panagiotis; Konstantis, Spyridon; Gakis, Angelos;
  * Geomechanics and Tunnelling 9 (2016), No. 2, section 4, Fig. 2, eq. (4)
- * cult_I = sqrt( (N_rel,i^2 + M_rel,i^2) / (N_rel,max^2 + M_rel,max^2) )
+ * The four distances are those of the paper; the index is calculated in
+ * the normalised form, see index() above:
+ * cult_I = sqrt( (N_rel,i/N_rel,max)^2 + (M_rel,i/M_rel,max)^2 ) / sqrt(2)
  * M_rel,i, N_rel,i: distances of the point to the curve in the direction
  * of M and of N. M_rel,max, N_rel,max: the same distances of the point
  * in the 'centre' of the curve (M = 0, normal force of the largest

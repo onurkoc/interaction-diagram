@@ -139,16 +139,31 @@ from this paper:
 > linings under geotechnical uncertainty. Geomechanics and Tunnelling 9
 > (2016), No. 2.
 
-Equation (4) of the paper:
+The app takes the four distances of the paper and calculates the index in
+a normalised form:
 
 $$
-\text{CULT-I} = \sqrt{\frac{N_{rel,i}^2 + M_{rel,i}^2}{N_{rel,max}^2 + M_{rel,max}^2}}
+\text{CULT-I} = \frac{1}{\sqrt{2}} \sqrt{\left(\frac{N_{rel,i}}{N_{rel,max}}\right)^2 + \left(\frac{M_{rel,i}}{M_{rel,max}}\right)^2}
 $$
 
 ![The distances of CULT-I in the diagram of the app](images/cult-i.svg)
 
 The sketch shows the four distances with the axes of the app: N vertical
 with compression at the top, M horizontal.
+
+**This deviates from the paper.** Its equation (4) is
+
+$$
+\text{CULT-I} = \sqrt{\frac{N_{rel,i}^2 + M_{rel,i}^2}{N_{rel,max}^2 + M_{rel,max}^2}}
+$$
+
+It adds squares of forces and of moments (e.g. kN² and kNm²). The result
+then depends on the units, and the part with the larger numbers, usually
+the normal force, decides the index almost alone. In the normalised form
+each distance is divided by its own reference value first, so the index
+has no units and M and N count the same. The centre of the curve still
+gives 1 and a point on the curve 0. **The values are not comparable with
+values from equation (4)** or from earlier versions of this app.
 
 **CULT-I is a reserve index, not a utilization: 0 means the point is on
 the capacity curve (limit state), a large value means a large reserve.**
