@@ -5,6 +5,8 @@ Clause numbers refer to SIA 262:2025 unless stated otherwise.
 Decisions D1..D7 and findings: see NOTES.md.
 */
 
+import { comma } from './en1992.js';
+
 /** @typedef {import('./en1992.js').Norm} Norm */
 /** @typedef {import('./en1992.js').NormParams} NormParams */
 
@@ -83,12 +85,12 @@ export const sia262 = {
         const messages = [];
         if (p.f_ck > this.f_ck_max) {
             // decision D4
-            messages.push(`f_ck = ${p.f_ck} N/mm²: nur bis ` +
+            messages.push(`f_ck = ${comma(p.f_ck)} N/mm²: nur bis ` +
                           `${this.f_ck_max} N/mm² (C50/60) zulässig.`);
         }
         if (p.eta_t === undefined || !eta_t_values.includes(p.eta_t)) {
             // 4.2.1.3
-            messages.push(`eta_t = ${p.eta_t}: zulässig ist ` +
+            messages.push(`eta_t = ${comma(p.eta_t)}: zulässig ist ` +
                           '1,0 / 0,85 / 1,2.');
         }
         return messages;

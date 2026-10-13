@@ -52,13 +52,23 @@ const HOVERLABEL = {
 };
 
 /**
- * Number with a fixed number of decimals, like '{:.2f}'.format(x)
+ * Number with a fixed number of decimals, like '{:.2f}'.format(x),
+ * with a decimal comma as everywhere in the output of the app.
  * @param {number} x
  * @param {number} digits
  * @returns {string}
  */
 export function fmt(x, digits) {
-    return x.toFixed(digits);
+    return x.toFixed(digits).replace('.', ',');
+}
+
+/**
+ * Number as it was entered, with a decimal comma.
+ * @param {number | undefined} x
+ * @returns {string}
+ */
+export function num(x) {
+    return String(x).replace('.', ',');
 }
 
 /**
@@ -152,8 +162,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         val['Moment Neg'].slice().reverse()));
     const concrete_y = kilo(val['Normal Force'].concat(
         val['Normal Force Neg'].slice().reverse()));
-    const section = `h = ${i_val['h']} m<br>b = ${i_val['b']} m<br>` +
-        `d_1 = ${i_val['d_1']} m<br>d_2 = ${i_val['d_2']} m<br>`;
+    const section = `h = ${num(i_val['h'])} m<br>b = ${num(i_val['b'])} m<br>` +
+        `d_1 = ${num(i_val['d_1'])} m<br>d_2 = ${num(i_val['d_2'])} m<br>`;
     let name_concrete;
     if (i_val['plain']) {
         // plain concrete section: the strength is reduced (D7)
@@ -243,7 +253,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
 
         if (inside.length > 0) {
             let name_inside = `Lastpunkte innerhalb: ${inside.length} von ` +
-                `${total}<br>Bemessungswerte, γ_d = ${i_val['gamma_d']}`;
+                `${total}<br>Bemessungswerte, γ_d = ${num(i_val['gamma_d'])}`;
             const smallest = min_cult_I(inside.map(entry => entry.p));
             if (typeof smallest === 'number') {
                 name_inside += `<br>min. CULT-I: ${fmt(smallest, 3)}`;
@@ -272,7 +282,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
                 y: kilo(outside.map(entry => entry.p.n)),
                 mode: 'markers',
                 name: `Lastpunkte ausserhalb der Kurve: ${outside.length} ` +
-                    `von ${total}<br>Bemessungswerte, γ_d = ${i_val['gamma_d']}`,
+                    `von ${total}<br>Bemessungswerte, γ_d = ${num(i_val['gamma_d'])}`,
                 marker: {
                     color: 'red',
                     size: 8,
@@ -316,6 +326,8 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         margin: { l: 60, r: 20, b: 50, t: 50, pad: 4 },
         hovermode: 'closest',
         autosize: true,
+        // decimal comma, thin space for thousands
+        separators: ', ',
         xaxis: {
             tickformat: '.0f',
             title: { text: 'Moment M [kNm]', font: { size: 16 } },

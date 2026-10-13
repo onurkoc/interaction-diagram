@@ -10,7 +10,7 @@ import { int_diagram, min_eccentricity_moments } from './core.js';
 import { cult_I_details, cult_I_min_eccentricity } from './cult_i.js';
 import { read } from './xls_read.js';
 import { load_points } from './loads.js';
-import { figure, draw, fmt, cult_text, min_cult_I } from './draw.js';
+import { figure, draw, fmt, num, cult_text, min_cult_I } from './draw.js';
 import { en1992 } from './norms/en1992.js';
 import { sia262, eta_fc } from './norms/sia262.js';
 
@@ -141,21 +141,21 @@ export function check_inputs(raw, norm) {
                          'gamma_d', 'alpha_cc_pl']) {
         if (field in numbers && numbers[field] <= 0) {
             messages.push({ field: field, text:
-                `${LABELS[field]} = ${numbers[field]}: muss grösser als 0 sein.` });
+                `${LABELS[field]} = ${num(numbers[field])}: muss grösser als 0 sein.` });
         }
     }
     for (const field of ['d_1', 'd_2', 'a_s1', 'a_s2']) {
         if (field in numbers && numbers[field] < 0) {
             messages.push({ field: field, text:
-                `${LABELS[field]} = ${numbers[field]}: darf nicht negativ sein.` });
+                `${LABELS[field]} = ${num(numbers[field])}: darf nicht negativ sein.` });
         }
     }
     for (const field of ['d_1', 'd_2']) {
         if (field in numbers && 'h_' in numbers &&
             numbers[field] >= numbers['h_']) {
             messages.push({ field: field, text:
-                `${LABELS[field]} = ${numbers[field]} m: muss kleiner ` +
-                `als die Höhe h = ${numbers['h_']} m sein.` });
+                `${LABELS[field]} = ${num(numbers[field])} m: muss kleiner ` +
+                `als die Höhe h = ${num(numbers['h_'])} m sein.` });
         }
     }
 
@@ -369,14 +369,14 @@ export function hints(norm, result, loads, with_cult) {
 
     if (norm === sia262) {
         list.push(`f_cd = η_fc · η_t · f_ck / γ_c = ` +
-                  `${fmt(eta_fc(i_val['f_ck']), 3)} · ${i_val['eta_t']} · ` +
-                  `${i_val['f_ck']} / ${i_val['gamma_c']}` +
+                  `${fmt(eta_fc(i_val['f_ck']), 3)} · ${num(i_val['eta_t'])} · ` +
+                  `${num(i_val['f_ck'])} / ${num(i_val['gamma_c'])}` +
                   (i_val['plain'] ? ' · 0,8' : '') +
                   ` = ${fmt(i_val['f_cd'], 2)} N/mm²`);
     } else {
         const alpha = i_val['plain'] ? i_val['alpha_cc_pl'] : i_val['alpha_cc'];
         list.push(`f_cd = ${i_val['plain'] ? 'α_cc,pl' : 'α_cc'} · f_ck / γ_c = ` +
-                  `${alpha} · ${i_val['f_ck']} / ${i_val['gamma_c']}` +
+                  `${num(alpha)} · ${num(i_val['f_ck'])} / ${num(i_val['gamma_c'])}` +
                   ` = ${fmt(i_val['f_cd'], 2)} N/mm²`);
     }
     if (i_val['plain']) {
@@ -414,10 +414,10 @@ export function hints(norm, result, loads, with_cult) {
 
     if (loads !== null) {
         list.push(`Lastpunkte aus «${loads.name}»: ${loads.x.length} Punkte, ` +
-                  `mit γ_d = ${i_val['gamma_d']} multipliziert.`);
+                  `mit γ_d = ${num(i_val['gamma_d'])} multipliziert.`);
         if (loads.per_metre) {
             list.push('Plaxis-Tabelle mit Werten pro Meter [kN/m, kNm/m]: ' +
-                      `mit der Breite b = ${i_val['b']} m multipliziert.`);
+                      `mit der Breite b = ${num(i_val['b'])} m multipliziert.`);
         }
         list.push('Vorzeichen: N negativ = Druck. Das Vorzeichen von M wird ' +
                   'wie in der Datei übernommen, nichts wird umgekehrt. ' +
@@ -655,7 +655,7 @@ export function start({ XLSX, Plotly }) {
         // presets of the norm, only where nothing is entered yet
         for (const [field, value] of Object.entries(norm.defaults)) {
             if (input(field).value.trim() === '') {
-                input(field).value = String(value);
+                input(field).value = num(value);
             }
         }
         update();
