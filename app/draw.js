@@ -30,6 +30,8 @@ without a browser. draw() hands them to Plotly.
  * @property {number} m_mod  moment used for the check [MNm]: m, or the
  *     moment with the minimum eccentricity (EN 1992-1-1 6.1 (4))
  * @property {boolean} modified  true: m_mod is not m
+ * @property {boolean} inside  the point of the check (m_mod, n) is inside
+ *     of the curve with reinforcement
  * @property {CultIDetails | 'outside' | null} cult  null: not calculated
  */
 
@@ -118,6 +120,19 @@ export function min_cult_I(points) {
 export function figure(i_val, val, norm, points, { e0 = null, narrow = false } = {}) {
     /** @type {Object[]} */
     const data = [];
+    // the legend as text, one line for each trace (for small screens)
+    /** @type {string[]} */
+    const legend_lines = [];
+    /**
+     * @param {string} colour  how the trace looks
+     * @param {Object} trace
+     */
+    const add = (colour, trace) => {
+        data.push(trace);
+        const name = /** @type {any} */ (trace).name.split('<br>').filter(
+            (/** @type {string} */ part) => part !== '').join(', ');
+        legend_lines.push(`${colour}: ${name}`);
+    };
 
     // closed curve: right side, then the left side backwards
     const concrete_x = val['Moment'].concat(val['Moment Neg'].slice().reverse());
@@ -134,7 +149,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         name_concrete = 'Beton ohne Bewehrung (Vergleich)<br>' +
             `f_cd = ${fmt(i_val['f_cd'], 2)} N/mm²<br>` + section;
     }
-    data.push({
+    add('blau', {
         type: 'scatter',
         x: concrete_x,
         y: concrete_y,
@@ -151,7 +166,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
             val['Moment Reinf Neg'].slice().reverse());
         const reinf_y = val['Normal Force Reinf'].concat(
             val['Normal Force Reinf Neg'].slice().reverse());
-        data.push({
+        add('grün gestrichelt', {
             type: 'scatter',
             x: reinf_x,
             y: reinf_y,
@@ -171,7 +186,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         // minimum eccentricity (EN 1992-1-1 6.1 (4), D1): rays M = +-e0 * N
         // for compression, from the largest compression force to N = 0 and back
         const n_min = Math.min(...val['Normal Force Reinf']);
-        data.push({
+        add('grau gestrichelt', {
             type: 'scatter',
             x: [-e0 * n_min, 0, e0 * n_min],
             y: [n_min, 0, n_min],
@@ -183,45 +198,79 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
     }
 
     if (points.length > 0) {
-        const smallest = min_cult_I(points);
-        let name_points = `Lastpunkte (Bemessungswerte, γ_d = ${i_val['gamma_d']})`;
-        if (smallest === 'outside') {
-            name_points += '<br>CULT-I: Punkt ausserhalb';
-        } else if (smallest !== null) {
-            name_points += `<br>min. CULT-I: ${fmt(smallest, 3)}`;
+        // Two traces: points inside and points outside of the curve, so
+        // that the legend says how many there are of each.
+        /**
+         * @param {LoadPoint} p
+         * @param {number} i  index of the point in the table
+         * @returns {string}
+         */
+        const hover_point = (p, i) => {
+            let text = `Punkt ${i + 1}<br>M: ${fmt(p.m, 3)} MNm<br>` +
+                `N: ${fmt(p.n, 3)} MN`;
+            if (p.modified) {
+                text += `<br>M mit Mindestausmitte: ${fmt(p.m_mod, 3)} MNm`;
+            }
+            if (!p.inside) {
+                text += '<br>ausserhalb der Kurve';
+            } else if (p.cult !== null) {
+                text += `<br>CULT-I: ${cult_text(p.cult)}`;
+            }
+            return text;
+        };
+        const numbered = points.map((p, i) => ({ p: p, i: i }));
+        const inside = numbered.filter(entry => entry.p.inside);
+        const outside = numbered.filter(entry => !entry.p.inside);
+        const total = points.length;
+
+        if (inside.length > 0) {
+            let name_inside = `Lastpunkte innerhalb: ${inside.length} von ` +
+                `${total}<br>Bemessungswerte, γ_d = ${i_val['gamma_d']}`;
+            const smallest = min_cult_I(inside.map(entry => entry.p));
+            if (typeof smallest === 'number') {
+                name_inside += `<br>min. CULT-I: ${fmt(smallest, 3)}`;
+            }
+            add('grüne Punkte', {
+                type: 'scatter',
+                x: inside.map(entry => entry.p.m),
+                y: inside.map(entry => entry.p.n),
+                mode: 'markers',
+                name: name_inside,
+                marker: {
+                    color: '#2e8b57',
+                    size: 8,
+                    symbol: 'diamond',
+                    line: { color: 'black', width: 1 },
+                },
+                text: inside.map(entry => hover_point(entry.p, entry.i)),
+                hoverinfo: 'text',
+                hoverlabel: HOVERLABEL,
+            });
         }
-        data.push({
-            type: 'scatter',
-            x: points.map(p => p.m),
-            y: points.map(p => p.n),
-            mode: 'markers',
-            name: name_points,
-            showlegend: true,
-            marker: {
-                color: 'red',
-                size: 8,
-                symbol: 'diamond',
-                line: { color: 'black', width: 1 },
-            },
-            text: points.map((p, i) => {
-                let text = `Punkt ${i + 1}<br>M: ${fmt(p.m, 3)} MNm<br>` +
-                    `N: ${fmt(p.n, 3)} MN`;
-                if (p.modified) {
-                    text += `<br>M mit Mindestausmitte: ${fmt(p.m_mod, 3)} MNm`;
-                }
-                if (p.cult !== null) {
-                    text += `<br>CULT-I: ${cult_text(p.cult)}`;
-                }
-                return text;
-            }),
-            hoverinfo: 'text',
-            hoverlabel: HOVERLABEL,
-        });
+        if (outside.length > 0) {
+            add('rote Punkte', {
+                type: 'scatter',
+                x: outside.map(entry => entry.p.m),
+                y: outside.map(entry => entry.p.n),
+                mode: 'markers',
+                name: `Lastpunkte ausserhalb der Kurve: ${outside.length} ` +
+                    `von ${total}<br>Bemessungswerte, γ_d = ${i_val['gamma_d']}`,
+                marker: {
+                    color: 'red',
+                    size: 8,
+                    symbol: 'diamond',
+                    line: { color: 'black', width: 1 },
+                },
+                text: outside.map(entry => hover_point(entry.p, entry.i)),
+                hoverinfo: 'text',
+                hoverlabel: HOVERLABEL,
+            });
+        }
 
         // points moved by the minimum eccentricity
         const moved = points.filter(p => p.modified);
         if (moved.length > 0) {
-            data.push({
+            add('hohle Punkte', {
                 type: 'scatter',
                 x: moved.map(p => p.m_mod),
                 y: moved.map(p => p.n),
@@ -231,7 +280,7 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
                     color: 'rgba(0, 0, 0, 0)',
                     size: 8,
                     symbol: 'diamond',
-                    line: { color: 'red', width: 1.5 },
+                    line: { color: '#555', width: 1.5 },
                 },
                 text: moved.map(p =>
                     `M mit Mindestausmitte: ${fmt(p.m_mod, 3)} MNm<br>` +
@@ -276,20 +325,6 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         layout.title.text = norm.name;
         layout.showlegend = false;
     }
-
-    // the legend as text, one line for each trace
-    const colours = { blue: 'blau', green: 'grün gestrichelt',
-                      gray: 'grau gestrichelt', red: 'rot' };
-    const legend_lines = data.map(trace => {
-        const t = /** @type {any} */ (trace);
-        const colour = t.line ? t.line.color : t.marker.line.color === 'red' ?
-            'red' : t.marker.color;
-        const name = t.name.split('<br>').filter(
-            (/** @type {string} */ part) => part !== '').join(', ');
-        const hollow = t.marker && t.marker.line.color === 'red' ? ', hohl' : '';
-        return `${/** @type {Object<string, string>} */ (colours)[colour]}` +
-            `${hollow}: ${name}`;
-    });
 
     return { data: data, layout: layout, legend_lines: legend_lines };
 }

@@ -136,6 +136,7 @@ test('calculate: load points are gamma_d * value / 1000', () => {
     for (const p of result.points) {
         assert.equal(p.m_mod, p.m);
         assert.equal(p.modified, false);
+        assert.equal(p.inside, true);
         assert.deepEqual(p.cult, cult_I_details(p.m, p.n, result.values));
     }
     // without a file: only the curves
@@ -178,12 +179,13 @@ test('calculate: minimum eccentricity moves the load points (EN, D1)', () => {
 test('table: values in kN and kNm with the intermediate values of CULT-I', () => {
     /** @type {import('../app/draw.js').LoadPoint[]} */
     const points = [
-        { m: 0.1, n: -1.5, m_mod: 0.1, modified: false,
+        { m: 0.1, n: -1.5, m_mod: 0.1, modified: false, inside: true,
           cult: { cult_I: 0.5, m_rel_i: 0.2, n_rel_i: 1.25,
                   m_rel_max: 0.4, n_rel_max: 2.5 } },
-        { m: 0.9, n: -1, m_mod: 0.9, modified: false, cult: 'outside' },
+        { m: 0.9, n: -1, m_mod: 0.9, modified: false, inside: false,
+          cult: 'outside' },
         // not capped: a value above 1 is shown and marked
-        { m: 0, n: -3, m_mod: 0.06, modified: true,
+        { m: 0, n: -3, m_mod: 0.06, modified: true, inside: true,
           cult: { cult_I: 1.2, m_rel_i: 0.3, n_rel_i: 3,
                   m_rel_max: 0.4, n_rel_max: 2.5 } },
     ];
@@ -251,8 +253,8 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
     const names = fig.data.map(trace => /** @type {any} */ (trace).name);
     assert.equal(names.length, 5);
     assert.match(names[2], /Mindestausmitte M = ±e0·N<br>e0 = 0\.020 m/);
-    assert.match(names[3], /Lastpunkte \(Bemessungswerte, γ_d = 1\)/);
-    assert.match(names[3], /min\. CULT-I: \d\.\d{3}/);
+    assert.match(names[3],
+        /^Lastpunkte innerhalb: 2 von 2<br>Bemessungswerte, γ_d = 1<br>min\. CULT-I: \d\.\d{3}$/);
     assert.equal(names[4], 'Lastpunkte mit Mindestausmitte');
     // the original points stay, only the moved point is drawn again
     assert.deepEqual(/** @type {any} */ (fig.data[3]).x, [0.01, 0.1]);
@@ -307,6 +309,42 @@ test('figure: small screen, the legend is given as text', () => {
                  /^blau: Beton ohne Bewehrung \(Vergleich\), f_cd = 20\.00 N\/mm²/);
     assert.match(narrow.legend_lines[1], /^grün gestrichelt: Mit Bewehrung, a_s1 = 5\.24 cm²/);
     assert.match(narrow.legend_lines[2], /^grau gestrichelt: Mindestausmitte/);
-    assert.match(narrow.legend_lines[3], /^rot: Lastpunkte \(Bemessungswerte/);
-    assert.match(narrow.legend_lines[4], /^rot, hohl: Lastpunkte mit Mindestausmitte$/);
+    assert.match(narrow.legend_lines[3], /^grüne Punkte: Lastpunkte innerhalb: 2 von 2, /);
+    assert.match(narrow.legend_lines[4], /^hohle Punkte: Lastpunkte mit Mindestausmitte$/);
+});
+
+test('figure: load points inside and outside are two traces with their numbers', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    // the second and the fourth point are far outside of the curve
+    const loads = { x: [10, 900, 50, -900], y: [-1000, -1000, -2000, -1000],
+                    per_metre: false, name: 'test.xlsx' };
+    for (const with_cult of [true, false]) {
+        const result = calculate(params, en1992, loads, with_cult);
+        assert.deepEqual(result.points.map(p => p.inside),
+                         [true, false, true, false]);
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points);
+        const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
+        assert.equal(fig.data.length, 4);
+        assert.match(inside.name, /^Lastpunkte innerhalb: 2 von 4<br>/);
+        assert.match(outside.name, /^Lastpunkte ausserhalb der Kurve: 2 von 4<br>/);
+        assert.deepEqual(inside.x, [0.01, 0.05]);
+        assert.deepEqual(outside.x, [0.9, -0.9]);
+        assert.notEqual(inside.marker.color, outside.marker.color);
+        // the smallest CULT-I is the one of the points inside
+        assert.equal(/min\. CULT-I/.test(inside.name), with_cult);
+        assert.doesNotMatch(outside.name, /CULT-I/);
+        // the numbers of the points are the ones of the table
+        assert.match(outside.text[1], /^Punkt 4<br>/);
+        assert.match(outside.text[1], /ausserhalb der Kurve/);
+    }
+
+    // all points inside: no trace for points outside
+    const all_inside = calculate(params, en1992,
+        { x: [10], y: [-1000], per_metre: false, name: 'test.xlsx' }, true);
+    const names = figure(all_inside.input_values, all_inside.values, en1992,
+                         all_inside.points).data.map(
+        trace => /** @type {any} */ (trace).name);
+    assert.equal(names.length, 3);
+    assert.match(names[2], /^Lastpunkte innerhalb: 1 von 1<br>/);
 });
