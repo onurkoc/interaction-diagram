@@ -73,6 +73,19 @@ test('check_inputs: complete input gives the parameters', () => {
     assert.equal('eta_t' in en.params, false);
 });
 
+test('check_inputs: the cross-section has no presets, an empty field is rejected', () => {
+    for (const field of ['h_', 'b_', 'a_s1', 'a_s2', 'd_1', 'd_2']) {
+        const { messages } = check_inputs(raw({ [field]: '' }), en1992);
+        assert.deepEqual(fields(messages), [field]);
+        assert.match(messages[0].text, / fehlt\.$/);
+    }
+    // nothing entered at all: one message for each of them
+    const empty = check_inputs(raw({ h_: '', b_: ' ', a_s1: '', a_s2: '',
+                                     d_1: '', d_2: '' }), sia262);
+    assert.deepEqual(fields(empty.messages),
+                     ['h_', 'b_', 'd_1', 'd_2', 'a_s1', 'a_s2']);
+});
+
 test('check_inputs: the load factor has no preset', () => {
     const { messages } = check_inputs(raw({ gamma_d: '' }), en1992);
     assert.deepEqual(fields(messages), ['gamma_d']);
