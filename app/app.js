@@ -333,6 +333,28 @@ export function table(points, with_eccentricity, with_cult) {
 }
 
 /**
+ * One line above the table: how many points are inside and outside of
+ * the curve, and the smallest CULT-I of the points inside.
+ * @param {LoadPoint[]} points
+ * @param {boolean} with_cult
+ * @returns {string}
+ */
+export function summary_text(points, with_cult) {
+    if (points.length === 0) {
+        return '';
+    }
+    const inside = points.filter(p => p.inside);
+    const outside = points.length - inside.length;
+    let text = `${points.length} Lastpunkte (Bemessungswerte): ` +
+        `${inside.length} innerhalb, ${outside} ausserhalb der Kurve.`;
+    const smallest = min_cult_I(inside);
+    if (with_cult && typeof smallest === 'number') {
+        text += ` Kleinstes CULT-I der Punkte innerhalb: ${fmt(smallest, 3)}.`;
+    }
+    return text;
+}
+
+/**
  * Hints below the diagram: what was assumed and used.
  * @param {Norm} norm
  * @param {Result} result
@@ -506,9 +528,9 @@ export function start({ XLSX, Plotly }) {
      * @param {boolean} with_cult
      */
     function show_table(points, with_eccentricity, with_cult) {
+        summary.textContent = summary_text(points, with_cult);
         if (points.length === 0) {
             table_box.replaceChildren();
-            summary.textContent = '';
             return;
         }
         const { head, rows, marks } = table(points, with_eccentricity, with_cult);
@@ -530,16 +552,6 @@ export function start({ XLSX, Plotly }) {
             }
         });
         table_box.replaceChildren(table_element);
-
-        let text = `${points.length} Lastpunkte (Bemessungswerte).`;
-        const smallest = min_cult_I(points);
-        if (smallest === 'outside') {
-            const count = marks.filter(mark => mark === 'outside').length;
-            text += ` ${count} Punkt(e) ausserhalb der Kurve.`;
-        } else if (smallest !== null) {
-            text += ` Kleinstes CULT-I: ${fmt(smallest, 3)}.`;
-        }
-        summary.textContent = text;
     }
 
     /** Check the input, calculate and show everything. */
