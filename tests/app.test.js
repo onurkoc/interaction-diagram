@@ -6,7 +6,8 @@ The tests check what follows from the rules of the interface
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { NORMS, parse_number, check_inputs, calculate, table, hints }
+import { NORMS, parse_number, check_inputs, calculate, table, hints,
+         summary_text }
     from '../app/app.js';
 import { figure, min_cult_I } from '../app/draw.js';
 import { cult_I_details } from '../app/cult_i.js';
@@ -220,6 +221,16 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     const short = table(points, false, false);
     assert.deepEqual(short.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]']);
     assert.deepEqual(short.rows[0], ['1', '-1500.0', '100.00']);
+
+    // summary: number of points outside and the smallest CULT-I inside
+    assert.equal(summary_text(points, true),
+        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der ' +
+        'Kurve. Kleinstes CULT-I der Punkte innerhalb: 0.500.');
+    assert.equal(summary_text(points, false),
+        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der Kurve.');
+    assert.equal(summary_text([points[1]], true),
+        '1 Lastpunkte (Bemessungswerte): 0 innerhalb, 1 ausserhalb der Kurve.');
+    assert.equal(summary_text([], true), '');
 
     assert.equal(min_cult_I(points), 'outside');
     assert.equal(min_cult_I([points[0], points[2]]), 0.5);
