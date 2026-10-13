@@ -163,9 +163,21 @@ label.check {
     border-radius: 3px;
 }
 
+/* the label on a line of its own, the options side by side below it */
+.choice-label {
+    display: block;
+}
+
+.choice .options {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 20px;
+}
+
 .choice label.check {
     display: inline-flex;
-    margin-right: 12px;
+    margin-top: 6px;
+    white-space: nowrap;
 }
 
 input.invalid,
