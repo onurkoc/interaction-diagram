@@ -539,3 +539,47 @@ test('CULT-I of all points inside the curve is between 0 and 1', () => {
         assert.ok(inside > 0);
     }
 });
+
+test('N12: inside means between the two sides of the curve', () => {
+    // Curve with ends that are not at M = 0 (as with unsymmetric
+    // reinforcement): both sides start and end at M = 0.25.
+    const n = [-2, -1, 0];
+    const values = /** @type {any} */ ({
+        'Moment': [], 'Moment Neg': [],
+        'Normal Force': [], 'Normal Force Neg': [],
+        'Moment Reinf': [0.25, 1, 0.25],
+        'Normal Force Reinf': n,
+        'Moment Reinf Neg': [0.25, -1, 0.25],
+        'Normal Force Reinf Neg': n,
+    });
+    const input_values = /** @type {any} */ ({ a_s1: 3, a_s2: 9 });
+    // Near the compression end, N = -1.9: the right side is at M = 0.325,
+    // the left side at M = 0.125. A small positive moment is outside of
+    // the left side, although it is inside of the right side.
+    assert.equal(cult_I(0.1, -1.9, input_values, values), 'outside');
+    assert.equal(cult_I(0, -1.9, input_values, values), 'outside');
+    assert.equal(cult_I(-0.1, -1.9, input_values, values), 'outside');
+    assert.equal(cult_I(0.4, -1.9, input_values, values), 'outside');
+    // between the two sides
+    assert.equal(typeof cult_I(0.2, -1.9, input_values, values), 'number');
+    // the same near the tension end, N = -0.1
+    assert.equal(cult_I(0.1, -0.1, input_values, values), 'outside');
+    assert.equal(typeof cult_I(0.2, -0.1, input_values, values), 'number');
+});
+
+test('N12: unsymmetric section, no jump of inside / outside at m = 0', () => {
+    for (const params of UNSYMMETRIC_SECTIONS) {
+        const result = int_diagram(params);
+        assert.notEqual(result, null);
+        const [input_values, values] = /** @type {any} */ (result);
+        const n_compression = Math.min(...values['Normal Force Reinf']);
+        const n_tension = Math.max(...values['Normal Force Reinf']);
+        // The ends of the curve are not at M = 0: close to the ends
+        // M = 0 is outside, and so is a very small moment of either sign.
+        for (const n of [n_compression + 0.01, n_tension - 0.01]) {
+            assert.equal(cult_I(0, n, input_values, values), 'outside');
+            assert.equal(cult_I(1e-9, n, input_values, values), 'outside');
+            assert.equal(cult_I(-1e-9, n, input_values, values), 'outside');
+        }
+    }
+});
