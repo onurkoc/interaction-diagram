@@ -25,7 +25,7 @@ function raw(changes = {}) {
         a_s1: '5.24', a_s2: '5.24', f_ck: '30', f_yk: '500',
         gamma_c: '1.5', gamma_s: '1.15', gamma_d: '1.35',
         alpha_cc: '1.0', alpha_cc_pl: '0.8', eta_t: '0.85',
-        eccentricity: false, cult: true,
+        eccentricity: false, cult: true, radial: true,
         ...changes,
     };
 }
@@ -200,12 +200,14 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     /** @type {import('../app/draw.js').LoadPoint[]} */
     const points = [
         { m: 0.1, n: -1.5, m_mod: 0.1, modified: false, inside: true,
+          utilization: 0.4,
           cult: { cult_I: 0.5, m_rel_i: 0.2, n_rel_i: 1.25,
                   m_rel_max: 0.4, n_rel_max: 2.5 } },
         { m: 0.9, n: -1, m_mod: 0.9, modified: false, inside: false,
-          cult: 'outside' },
+          utilization: 2.5, cult: 'outside' },
         // not capped: a value above 1 is shown and marked
         { m: 0, n: -3, m_mod: 0.06, modified: true, inside: true,
+          utilization: 0.75,
           cult: { cult_I: 1.2, m_rel_i: 0.3, n_rel_i: 3,
                   m_rel_max: 0.4, n_rel_max: 2.5 } },
     ];
@@ -237,8 +239,29 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     }
 
     const short = table(points, false, false);
-    assert.deepEqual(short.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]']);
-    assert.deepEqual(short.rows[0], ['1', '-1500,0', '100,00']);
+    // nothing switched on: inside / outside is still shown
+    assert.deepEqual(short.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]', 'Hinweis']);
+    assert.deepEqual(short.rows[0], ['1', '-1500,0', '100,00', '']);
+    assert.deepEqual(short.rows[1], ['2', '-1000,0', '900,00',
+                                     'Punkt ausserhalb der Kurve']);
+    assert.deepEqual(short.marks, ['', 'outside', '']);
+
+    // radial utilization only: one column, above 1 outside, not capped
+    const radial = table(points, false, false, true);
+    assert.deepEqual(radial.head, ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]',
+                                   'Ausnutzung radial', 'Hinweis']);
+    assert.deepEqual(radial.rows.map(row => row[3]), ['0,400', '2,500', '0,750']);
+    assert.deepEqual(radial.keys.map(key => key[3]), [0.4, 2.5, 0.75]);
+    // sorted by the utilization, descending: the point outside first
+    assert.deepEqual(sort_order(radial.keys, 3, true), [1, 2, 0]);
+    // both: the utilization stands before the columns of CULT-I
+    const both = table(points, true, true, true);
+    assert.equal(both.head.indexOf('Ausnutzung radial'), 4);
+    assert.equal(both.head.indexOf('M_rel,i [kNm]'), 5);
+    assert.equal(both.head.length, full.head.length + 1);
+    for (const row of both.rows) {
+        assert.equal(row.length, both.head.length);
+    }
 
     // summary: number of points outside and the smallest CULT-I inside
     assert.equal(summary_text(points, true),
@@ -249,6 +272,16 @@ test('table: values in kN and kNm with the intermediate values of CULT-I', () =>
     assert.equal(summary_text([points[1]], true),
         '1 Lastpunkte (Bemessungswerte): 0 innerhalb, 1 ausserhalb der Kurve.');
     assert.equal(summary_text([], true), '');
+    // with the radial utilization: the largest value inside, and of all
+    // points if there are points outside
+    assert.equal(summary_text(points, false, true),
+        '3 Lastpunkte (Bemessungswerte): 2 innerhalb, 1 ausserhalb der ' +
+        'Kurve. Grösste Ausnutzung radial der Punkte innerhalb: 0,750. ' +
+        'Grösste Ausnutzung radial aller Punkte: 2,500.');
+    assert.equal(summary_text([points[0], points[2]], true, true),
+        '2 Lastpunkte (Bemessungswerte): 2 innerhalb, 0 ausserhalb der ' +
+        'Kurve. Grösste Ausnutzung radial der Punkte innerhalb: 0,750. ' +
+        'Kleinstes CULT-I der Punkte innerhalb: 0,500.');
 
     assert.equal(min_cult_I(points), 'outside');
     assert.equal(min_cult_I([points[0], points[2]]), 0.5);
@@ -517,5 +550,106 @@ test('hover text, table and core give the same CULT-I for every point', () => {
         });
         assert.ok(result.points.some(p => p.inside));
         assert.ok(result.points.some(p => !p.inside));
+    }
+});
+test('radial utilization and CULT-I can be switched on and off', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    // the second point is far outside of the curve
+    const loads = { x: [10, 900, 50], y: [-1000, -1000, -2000],
+                    per_metre: false, name: 'test.xlsx' };
+    for (const [with_cult, with_radial] of [[true, true], [true, false],
+                                            [false, true], [false, false]]) {
+        const result = calculate(params, en1992, loads, with_cult, with_radial);
+        assert.equal(result.radial_defined, true);
+        // inside / outside is always determined
+        assert.deepEqual(result.points.map(p => p.inside), [true, false, true]);
+        for (const p of result.points) {
+            assert.equal(p.cult !== null, with_cult);
+            assert.equal(p.utilization !== null, with_radial);
+            if (p.utilization !== null) {
+                // below 1 inside, above 1 outside
+                assert.equal(p.utilization < 1, p.inside);
+            }
+        }
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points);
+        const [inside, outside] = /** @type {any[]} */ (fig.data.slice(2));
+        assert.match(inside.name, /^Lastpunkte innerhalb: 2 von 3<br>/);
+        assert.match(outside.name, /^Lastpunkte ausserhalb der Kurve: 1 von 3<br>/);
+        // legend and hover text name only what is switched on
+        assert.equal(/max\. Ausnutzung radial: \d,\d{3}/.test(inside.name), with_radial);
+        assert.equal(/max\. Ausnutzung radial: \d+,\d{3}/.test(outside.name), with_radial);
+        assert.equal(/min\. CULT-I/.test(inside.name), with_cult);
+        assert.equal(/Ausnutzung radial: 0,\d{3}/.test(inside.text[0]), with_radial);
+        assert.equal(/CULT-I: /.test(inside.text[0]), with_cult);
+        assert.match(outside.text[0], /ausserhalb der Kurve/);
+
+        const t = table(result.points, false, with_cult,
+                        with_radial && result.radial_defined);
+        assert.equal(t.head.includes('Ausnutzung radial'), with_radial);
+        assert.equal(t.head.includes('CULT-I'), with_cult);
+        assert.equal(t.head.includes('M_rel,i / M_rel,max'), with_cult);
+        assert.deepEqual(t.marks, ['', 'outside', '']);
+
+        const text = hints(en1992, result, loads, with_cult, with_radial).join('\n');
+        assert.equal(/Ausnutzung radial setzt proportionale Laststeigerung von N und M voraus\./
+            .test(text), with_radial);
+        assert.equal(/Reserve-Index/.test(text), with_cult);
+        const summary = summary_text(result.points, with_cult, with_radial);
+        assert.equal(/Grösste Ausnutzung radial der Punkte innerhalb/.test(summary),
+                     with_radial);
+        assert.equal(/Kleinstes CULT-I/.test(summary), with_cult);
+        assert.match(summary, /2 innerhalb, 1 ausserhalb/);
+    }
+});
+
+test('radial utilization: a load point of the calculation', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1' }), en1992);
+    const curves_only = calculate(params, en1992, null, false, true);
+    // a point of the curve as the load: utilization 1, half of it 0.5
+    const m = curves_only.values['Moment Reinf'][20] * 1000;
+    const n = curves_only.values['Normal Force Reinf'][20] * 1000;
+    const loads = { x: [m, m / 2, 0], y: [n, n / 2, 0], per_metre: false,
+                    name: 'test.xlsx' };
+    const result = calculate(params, en1992, loads, false, true);
+    const values = result.points.map(p => /** @type {number} */ (p.utilization));
+    assert.ok(Math.abs(values[0] - 1) < 1e-9);
+    assert.ok(Math.abs(values[1] - 0.5) < 1e-9);
+    assert.equal(values[2], 0);
+});
+
+test('radial utilization: with the minimum eccentricity at the modified moment', () => {
+    const { params } = check_inputs(raw({ eccentricity: true, gamma_d: '1' }),
+                                    en1992);
+    // e0 = 0.02 m: the first point is moved to M = 20 kNm, the second not
+    const loads = { x: [5, 100], y: [-1000, -1000], per_metre: false,
+                    name: 'test.xlsx' };
+    const result = calculate(params, en1992, loads, false, true);
+    const plain_points = calculate(
+        { ...params, eccentricity: false }, en1992,
+        { x: [20, 100], y: [-1000, -1000], per_metre: false, name: 't' },
+        false, true).points;
+    assert.equal(result.points[0].m_mod, 0.02);
+    assert.equal(result.points[0].utilization, plain_points[0].utilization);
+    assert.equal(result.points[1].utilization, plain_points[1].utilization);
+    assert.match(hints(en1992, result, loads, false, true).join('\n'),
+                 /Mit Mindestausmitte am geprüften Punkt \(M_Ed,mod\)\./);
+});
+
+test('radial utilization: not defined for a plain concrete section', () => {
+    for (const norm of [en1992, sia262]) {
+        const { params } = check_inputs(raw({ a_s1: '0', a_s2: '0' }), norm);
+        const loads = { x: [10], y: [-1000], per_metre: false, name: 'test.xlsx' };
+        const result = calculate(params, norm, loads, false, true);
+        assert.equal(result.radial_defined, false);
+        // no number, and a hint instead
+        assert.equal(result.points[0].utilization, null);
+        const text = hints(norm, result, loads, false, true).join('\n');
+        assert.match(text, /Ausnutzung radial bei unbewehrtem Querschnitt nicht definiert\./);
+        assert.doesNotMatch(text, /proportionale Laststeigerung/);
+        // inside / outside is still determined
+        assert.equal(result.points[0].inside, true);
+        assert.doesNotMatch(summary_text(result.points, false, true),
+                            /Ausnutzung/);
     }
 });

@@ -8,9 +8,11 @@ tested with node. start() connects them to index.html.
 */
 import { int_diagram, min_eccentricity_moments } from './core.js';
 import { cult_I_details, cult_I_min_eccentricity } from './cult_i.js';
+import { radial_utilization, origin_inside } from './utilization.js';
 import { read } from './xls_read.js';
 import { load_points } from './loads.js';
-import { figure, draw, fmt, num, cult_text, min_cult_I } from './draw.js';
+import { figure, draw, fmt, num, cult_text, min_cult_I, max_utilization }
+    from './draw.js';
 import { en1992 } from './norms/en1992.js';
 import { sia262, eta_fc } from './norms/sia262.js';
 
@@ -46,7 +48,8 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
  * @property {string} alpha_cc_pl  EN only
  * @property {string} eta_t  SIA only, '' as long as nothing is chosen
  * @property {boolean} eccentricity  EN only
- * @property {boolean} cult  calculate CULT-I
+ * @property {boolean} cult  show CULT-I (optional)
+ * @property {boolean} radial  show the radial utilization
  */
 
 /**
@@ -217,23 +220,50 @@ export function check_inputs(raw, norm) {
  * @property {Values} values
  * @property {LoadPoint[]} points  empty without a file
  * @property {number | null} e0  minimum eccentricity [m], null: not applied
+ * @property {boolean} radial_defined  the radial utilization exists for
+ *     this curve (the origin is inside of it)
  */
 
 /**
- * The whole calculation: capacity curves, load points, CULT-I.
+ * The whole calculation: capacity curves, load points, radial
+ * utilization, CULT-I. Whether a point is inside of the curve is always
+ * determined.
  * @param {InputParams} params  checked input (check_inputs)
  * @param {Norm} norm
  * @param {Loads | null} loads  null: no file
  * @param {boolean} with_cult  calculate CULT-I
+ * @param {boolean} [with_radial]  calculate the radial utilization
  * @returns {Result}
  */
-export function calculate(params, norm, loads, with_cult) {
+export function calculate(params, norm, loads, with_cult, with_radial = false) {
     const result = int_diagram(params, norm);
     if (result === null) {
         // check_inputs rejects these cases before
         throw new Error('Die Eingaben sind unzulässig.');
     }
     const [input_values, values] = result;
+    const radial_defined = origin_inside(values);
+    /**
+     * Radial utilization of a load point; with the minimum eccentricity
+     * at the modified moment(s), the larger value governs.
+     * @param {number[]} moments
+     * @param {number} n
+     * @returns {number | null}
+     */
+    const utilization = (moments, n) => {
+        if (!with_radial || !radial_defined) {
+            return null;
+        }
+        /** @type {number | null} */
+        let largest = null;
+        for (const m of moments) {
+            const value = radial_utilization(m, n, values);
+            if (value !== null && (largest === null || value > largest)) {
+                largest = value;
+            }
+        }
+        return largest;
+    };
 
     /** @type {number | null} */
     let e0 = null;
@@ -260,6 +290,7 @@ export function calculate(params, norm, loads, with_cult) {
                     modified: modified,
                     inside: check.details !== 'outside',
                     cult: with_cult ? check.details : null,
+                    utilization: utilization(moments, n[i]),
                 });
             } else {
                 // also without CULT-I: is the point inside of the curve?
@@ -270,12 +301,13 @@ export function calculate(params, norm, loads, with_cult) {
                     modified: false,
                     inside: details !== 'outside',
                     cult: with_cult ? details : null,
+                    utilization: utilization([m[i]], n[i]),
                 });
             }
         }
     }
     return { input_values: input_values, values: values,
-             points: points, e0: e0 };
+             points: points, e0: e0, radial_defined: radial_defined };
 }
 
 /**
@@ -284,23 +316,28 @@ export function calculate(params, norm, loads, with_cult) {
  * checked by hand.
  * @param {LoadPoint[]} points
  * @param {boolean} with_eccentricity  show the modified moment
- * @param {boolean} with_cult
+ * @param {boolean} with_cult  show CULT-I with its intermediate values
+ * @param {boolean} [with_radial]  show the radial utilization
  * @returns {{head: string[], rows: string[][], marks: string[],
  *            keys: SortKey[][]}}
  *     marks: '' / 'outside' / 'above' (CULT-I > 1) for each row;
  *     keys: the value behind each cell, for sorting (sort_order)
  */
-export function table(points, with_eccentricity, with_cult) {
+export function table(points, with_eccentricity, with_cult, with_radial = false) {
     const head = ['Nr.', 'N_Ed [kN]', 'M_Ed [kNm]'];
     if (with_eccentricity) {
         head.push('M_Ed,mod [kNm]');
+    }
+    if (with_radial) {
+        head.push('Ausnutzung radial');
     }
     if (with_cult) {
         head.push('M_rel,i [kNm]', 'N_rel,i [kN]',
                   'M_rel,max [kNm]', 'N_rel,max [kN]',
                   'M_rel,i / M_rel,max', 'N_rel,i / N_rel,max',
-                  'CULT-I', 'Hinweis');
+                  'CULT-I');
     }
+    head.push('Hinweis');
     /** @type {string[][]} */
     const rows = [];
     /** @type {SortKey[][]} */
@@ -317,16 +354,25 @@ export function table(points, with_eccentricity, with_cult) {
             row.push(fmt(p.m_mod * 1000, 2));
             key.push(p.m_mod * 1000);
         }
+        // inside or outside of the curve is always shown
         let mark = '';
-        if (with_cult && p.cult !== null) {
-            if (p.cult === 'outside') {
-                const hint = 'Punkt ausserhalb der Kurve';
-                row.push('', '', '', '', '', '', cult_text(p.cult), hint);
+        let hint = '';
+        if (!p.inside) {
+            hint = 'Punkt ausserhalb der Kurve';
+            mark = 'outside';
+        }
+        if (with_radial) {
+            // above 1 outside of the curve, not capped
+            row.push((p.utilization === null) ? '' : fmt(p.utilization, 3));
+            key.push(p.utilization);
+        }
+        if (with_cult) {
+            if (p.cult === null || p.cult === 'outside') {
+                row.push('', '', '', '', '', '',
+                         (p.cult === null) ? '' : cult_text(p.cult));
                 // no values: null is sorted to the end
-                key.push(null, null, null, null, null, null, null, hint);
-                mark = 'outside';
+                key.push(null, null, null, null, null, null, null);
             } else {
-                let hint = '';
                 if (p.cult.cult_I > 1) {
                     // the value is shown as it is, not capped
                     hint = 'CULT-I > 1, siehe Hinweis';
@@ -339,13 +385,14 @@ export function table(points, with_eccentricity, with_cult) {
                          fmt(p.cult.m_rel_max * 1000, 2),
                          fmt(p.cult.n_rel_max * 1000, 1),
                          fmt(m_ratio, 3), fmt(n_ratio, 3),
-                         cult_text(p.cult), hint);
+                         cult_text(p.cult));
                 key.push(p.cult.m_rel_i * 1000, p.cult.n_rel_i * 1000,
                          p.cult.m_rel_max * 1000, p.cult.n_rel_max * 1000,
-                         m_ratio, n_ratio, p.cult.cult_I,
-                         (hint === '') ? null : hint);
+                         m_ratio, n_ratio, p.cult.cult_I);
             }
         }
+        row.push(hint);
+        key.push((hint === '') ? null : hint);
         rows.push(row);
         keys.push(key);
         marks.push(mark);
@@ -396,12 +443,14 @@ export function sort_order(keys, column, descending) {
 
 /**
  * One line above the table: how many points are inside and outside of
- * the curve, and the smallest CULT-I of the points inside.
+ * the curve, the largest radial utilization and the smallest CULT-I of
+ * the points inside.
  * @param {LoadPoint[]} points
  * @param {boolean} with_cult
+ * @param {boolean} [with_radial]
  * @returns {string}
  */
-export function summary_text(points, with_cult) {
+export function summary_text(points, with_cult, with_radial = false) {
     if (points.length === 0) {
         return '';
     }
@@ -409,6 +458,17 @@ export function summary_text(points, with_cult) {
     const outside = points.length - inside.length;
     let text = `${points.length} Lastpunkte (Bemessungswerte): ` +
         `${inside.length} innerhalb, ${outside} ausserhalb der Kurve.`;
+    if (with_radial) {
+        const largest_inside = max_utilization(inside);
+        if (largest_inside !== null) {
+            text += ' Grösste Ausnutzung radial der Punkte innerhalb: ' +
+                `${fmt(largest_inside, 3)}.`;
+        }
+        const largest = max_utilization(points);
+        if (outside > 0 && largest !== null) {
+            text += ` Grösste Ausnutzung radial aller Punkte: ${fmt(largest, 3)}.`;
+        }
+    }
     const smallest = min_cult_I(inside);
     if (with_cult && typeof smallest === 'number') {
         text += ` Kleinstes CULT-I der Punkte innerhalb: ${fmt(smallest, 3)}.`;
@@ -422,9 +482,10 @@ export function summary_text(points, with_cult) {
  * @param {Result} result
  * @param {Loads | null} loads
  * @param {boolean} with_cult
+ * @param {boolean} [with_radial]
  * @returns {string[]}
  */
-export function hints(norm, result, loads, with_cult) {
+export function hints(norm, result, loads, with_cult, with_radial = false) {
     const i_val = result.input_values;
     /** @type {string[]} */
     const list = [];
@@ -487,6 +548,20 @@ export function hints(norm, result, loads, with_cult) {
                   'negatives M: Zug auf der Seite von a_s2. Bei Plaxis hängt ' +
                   'das Vorzeichen von M von der lokalen Achse der Platte ab; ' +
                   'bei a_s1 ≠ a_s2 oder d_1 ≠ d_2 die Zuordnung prüfen.');
+        if (with_radial && !result.radial_defined) {
+            // the origin is not inside of the curve, it ends there
+            list.push('Ausnutzung radial bei unbewehrtem Querschnitt ' +
+                      'nicht definiert.');
+        } else if (with_radial) {
+            list.push('Ausnutzung radial = |S_d| / |R_d| auf dem Strahl vom ' +
+                      'Ursprung durch den Lastpunkt: 1 = Punkt auf der Kurve, ' +
+                      'über 1 = ausserhalb (nicht gekappt).' +
+                      ((result.e0 !== null) ?
+                          ' Mit Mindestausmitte am geprüften Punkt (M_Ed,mod).' :
+                          ''));
+            list.push('Ausnutzung radial setzt proportionale Laststeigerung ' +
+                      'von N und M voraus.');
+        }
         if (with_cult) {
             list.push('CULT-I ist ein Reserve-Index, keine Ausnutzung: ' +
                       '0 = Punkt auf der Kurve (Grenzzustand), grosse Werte = ' +
@@ -569,6 +644,7 @@ export function start({ XLSX, Plotly }) {
             eta_t: (chosen === null) ? '' : chosen.value,
             eccentricity: input('eccentricity').checked,
             cult: input('cult').checked,
+            radial: input('radial').checked,
         };
     }
 
@@ -590,15 +666,16 @@ export function start({ XLSX, Plotly }) {
      * @param {LoadPoint[]} points
      * @param {boolean} with_eccentricity
      * @param {boolean} with_cult
+     * @param {boolean} with_radial
      */
-    function show_table(points, with_eccentricity, with_cult) {
-        summary.textContent = summary_text(points, with_cult);
+    function show_table(points, with_eccentricity, with_cult, with_radial) {
+        summary.textContent = summary_text(points, with_cult, with_radial);
         if (points.length === 0) {
             table_box.replaceChildren();
             return;
         }
         const { head, rows, marks, keys } = table(points, with_eccentricity,
-                                                  with_cult);
+                                                  with_cult, with_radial);
         // the column of the last click, if the table still has it
         let column = head.indexOf(sort.head);
         if (column === -1) {
@@ -624,7 +701,7 @@ export function start({ XLSX, Plotly }) {
                 // first click ascending, second click descending
                 sort = { head: text,
                          descending: sort.head === text && !sort.descending };
-                show_table(points, with_eccentricity, with_cult);
+                show_table(points, with_eccentricity, with_cult, with_radial);
             });
             cell.append(button);
             head_row.append(cell);
@@ -668,7 +745,7 @@ export function start({ XLSX, Plotly }) {
         let result = null;
         if (texts.length === 0) {
             try {
-                result = calculate(params, norm, loads, raw.cult);
+                result = calculate(params, norm, loads, raw.cult, raw.radial);
             } catch (error) {
                 texts = [(error instanceof Error) ? error.message : String(error)];
             }
@@ -681,20 +758,22 @@ export function start({ XLSX, Plotly }) {
             Plotly.purge(diagram);
             diagram.replaceChildren();
             hints_list.replaceChildren();
-            show_table([], false, false);
+            show_table([], false, false, false);
             return;
         }
         const narrow = window.innerWidth < 700;
         const fig = figure(result.input_values, result.values, norm,
                            result.points, { e0: result.e0, narrow: narrow });
         draw(Plotly, diagram, fig);
-        let lines = hints(norm, result, loads, raw.cult);
+        let lines = hints(norm, result, loads, raw.cult, raw.radial);
         if (narrow) {
             // small screen: the legend is shown as text
             lines = fig.legend_lines.concat(lines);
         }
         fill(hints_list, lines, 'li');
-        show_table(result.points, result.e0 !== null, raw.cult);
+        // no column for a value that is not defined for this curve
+        show_table(result.points, result.e0 !== null, raw.cult,
+                   raw.radial && result.radial_defined);
     }
 
     /**

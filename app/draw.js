@@ -33,6 +33,8 @@ without a browser. draw() hands them to Plotly.
  * @property {boolean} inside  the point of the check (m_mod, n) is inside
  *     of the curve with reinforcement
  * @property {CultIDetails | 'outside' | null} cult  null: not calculated
+ * @property {number | null} utilization  radial utilization |S_d| / |R_d|,
+ *     null: not calculated or not defined for this curve
  */
 
 /**
@@ -127,6 +129,23 @@ export function min_cult_I(points) {
         }
     }
     return smallest;
+}
+
+/**
+ * Largest radial utilization of the load points, null if there is none.
+ * @param {LoadPoint[]} points
+ * @returns {number | null}
+ */
+export function max_utilization(points) {
+    /** @type {number | null} */
+    let largest = null;
+    for (const point of points) {
+        if (point.utilization !== null &&
+            (largest === null || point.utilization > largest)) {
+            largest = point.utilization;
+        }
+    }
+    return largest;
 }
 
 /**
@@ -239,6 +258,9 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
                 text += '<br>M mit Mindestausmitte: ' +
                     `${fmt(p.m_mod * 1000, 2)} kNm`;
             }
+            if (p.utilization !== null) {
+                text += `<br>Ausnutzung radial: ${fmt(p.utilization, 3)}`;
+            }
             if (!p.inside) {
                 text += '<br>ausserhalb der Kurve';
             } else if (p.cult !== null) {
@@ -254,6 +276,10 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
         if (inside.length > 0) {
             let name_inside = `Lastpunkte innerhalb: ${inside.length} von ` +
                 `${total}<br>Bemessungswerte, γ_d = ${num(i_val['gamma_d'])}`;
+            const largest = max_utilization(inside.map(entry => entry.p));
+            if (largest !== null) {
+                name_inside += `<br>max. Ausnutzung radial: ${fmt(largest, 3)}`;
+            }
             const smallest = min_cult_I(inside.map(entry => entry.p));
             if (typeof smallest === 'number') {
                 name_inside += `<br>min. CULT-I: ${fmt(smallest, 3)}`;
@@ -276,13 +302,19 @@ export function figure(i_val, val, norm, points, { e0 = null, narrow = false } =
             });
         }
         if (outside.length > 0) {
+            let name_outside = 'Lastpunkte ausserhalb der Kurve: ' +
+                `${outside.length} von ${total}<br>` +
+                `Bemessungswerte, γ_d = ${num(i_val['gamma_d'])}`;
+            const largest = max_utilization(outside.map(entry => entry.p));
+            if (largest !== null) {
+                name_outside += `<br>max. Ausnutzung radial: ${fmt(largest, 3)}`;
+            }
             add('rote Punkte', {
                 type: 'scatter',
                 x: kilo(outside.map(entry => entry.p.m)),
                 y: kilo(outside.map(entry => entry.p.n)),
                 mode: 'markers',
-                name: `Lastpunkte ausserhalb der Kurve: ${outside.length} ` +
-                    `von ${total}<br>Bemessungswerte, γ_d = ${num(i_val['gamma_d'])}`,
+                name: name_outside,
                 marker: {
                     color: 'red',
                     size: 8,
