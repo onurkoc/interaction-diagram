@@ -47,6 +47,15 @@ header a {
     color: #b00020;
 }
 
+.start-error {
+    padding: 12px 16px;
+    font-size: 17px;
+    font-weight: bold;
+    border: 2px solid #b00020;
+    border-radius: 5px;
+    background: #fdecee;
+}
+
 [hidden] {
     display: none !important;
 }

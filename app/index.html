@@ -16,6 +16,10 @@
     <p>Querschnittsnachweis für Stahlbeton-Rechteckquerschnitte
         (Spritzbetonschalen) mit CULT-I. Nicht für Druckglieder mit
         Effekten 2. Ordnung.</p>
+    <!-- shown by the check at the end of the page if the app did not start -->
+    <p id="start-error" class="error start-error" hidden>Diese Seite muss
+        über einen Webserver geöffnet werden, siehe README (Running it
+        locally).</p>
     <h2>Norm wählen</h2>
     <nav class="norms">
         <a class="norm" href="#sia262">
@@ -148,6 +152,18 @@
     import { start } from './app.js';
     // plotly-basic.min.js is a classic script and sets window.Plotly
     start({ XLSX: XLSX, Plotly: window.Plotly });
+    window.app_started = true;
+</script>
+<!-- No silent page: a classic script (no module) checks after loading
+     whether start() has run. Modules do not load when the file is opened
+     directly from the disk (file://). -->
+<script>
+    window.addEventListener('load', function () {
+        // the module script above runs before the load event
+        if (window.app_started !== true) {
+            document.getElementById('start-error').hidden = false;
+        }
+    });
 </script>
 </body>
 </html>
