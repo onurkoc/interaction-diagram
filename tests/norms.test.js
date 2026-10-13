@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { int_diagram } from '../app/core.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { sia262, eta_fc, eta_t_values } from '../app/norms/sia262.js';
-import { assertClose } from './helpers.js';
+import { assertClose, throwsKey } from './helpers.js';
 
 test('SIA 262: f_cd of Tabelle 8 (eta_t = 1.0)', () => {
     // [f_ck, f_cd of Tabelle 8, tolerance]
@@ -38,8 +38,8 @@ test('SIA 262: eta_fc is 1.0 up to f_ck = 40 and smaller above', () => {
 
 test('SIA 262: eta_t has no silent preset', () => {
     const p = { f_ck: 30, f_yk: 500, gamma_c: 1.5, gamma_s: 1.15 };
-    assert.throws(() => sia262.f_cd(p), /eta_t/);
-    assert.throws(() => int_diagram({ f_ck: 30 }, sia262), /eta_t/);
+    throwsKey(() => sia262.f_cd(p), 'norm.eta_t_missing');
+    throwsKey(() => int_diagram({ f_ck: 30 }, sia262), 'norm.eta_t');
     assert.equal(sia262.defaults.eta_t, undefined);
 });
 
@@ -93,10 +93,10 @@ test('minimum eccentricity: EN has a rule, SIA has none', () => {
     assert.notEqual(en1992.min_eccentricity, null);
 
     // SIA mode rejects the eccentricity option, no silent correction
-    assert.throws(
+    throwsKey(
         () => int_diagram({ f_ck: 30, eta_t: 0.85, eccentricity: true },
                           sia262),
-        /Mindestausmitte/);
+        'core.no_min_eccentricity', { norm: 'SIA 262:2025' });
 });
 
 test('SIA and EN give the same curves for the same f_cd', () => {

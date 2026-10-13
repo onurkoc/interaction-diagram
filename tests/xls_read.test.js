@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import * as XLSX from '../app/vendor/xlsx.mjs';
 import { column_head, read_rows, read } from '../app/xls_read.js';
 import { design_values, section_forces, load_points } from '../app/loads.js';
+import { throwsKey } from './helpers.js';
 
 /**
  * Content of an .xlsx file with one sheet.
@@ -60,11 +61,10 @@ test('xls_read: the unit in the column head tells the kind of table', () => {
     assert.equal(column_head('       M_max [kN m/m]'), null);
     assert.equal(column_head('              Q [kN/m]'), null);
     // an unknown unit is rejected, not read as kN
-    assert.throws(() => column_head('N [MN]'),
-                  /Spalte «N \[MN\]»: Die Einheit ist nicht bekannt/);
-    assert.throws(() => column_head('M [kN/m]'), /Einheit ist nicht bekannt/);
-    assert.throws(() => column_head('N [kNm]'), /Einheit ist nicht bekannt/);
-    assert.throws(() => column_head('n []'), /Einheit ist nicht bekannt/);
+    throwsKey(() => column_head('N [MN]'), 'xls.unit_unknown_n', { head: 'N [MN]' });
+    throwsKey(() => column_head('M [kN/m]'), 'xls.unit_unknown_m');
+    throwsKey(() => column_head('N [kNm]'), 'xls.unit_unknown_n');
+    throwsKey(() => column_head('n []'), 'xls.unit_unknown_n');
 });
 
 test('xls_read: table of a plate from Plaxis 2D', () => {
@@ -95,10 +95,9 @@ test('xls_read: table of a plate from Plaxis 2D', () => {
 });
 
 test('xls_read: units per metre and not per metre are not mixed', () => {
-    assert.throws(() => read_rows([['N [kN]', 'M [kNm/m]'], [-100, 10]]),
-                  /Einheiten passen nicht zusammen: «N \[kN\]» und «M \[kNm\/m\]»/);
-    assert.throws(() => read_rows([['N [kN/m]', 'm'], [-100, 10]]),
-                  /Einheiten passen nicht zusammen/);
+    throwsKey(() => read_rows([['N [kN]', 'M [kNm/m]'], [-100, 10]]),
+              'xls.units_mixed', { n: 'N [kN]', m: 'M [kNm/m]' });
+    throwsKey(() => read_rows([['N [kN/m]', 'm'], [-100, 10]]), 'xls.units_mixed');
 });
 
 test('xls_read: order of the columns and other columns do not matter', () => {
@@ -113,17 +112,17 @@ test('xls_read: order of the columns and other columns do not matter', () => {
 
 test('xls_read: a head like "Moment" is not taken for a column', () => {
     // legacy/xls_read.py took "Moment" for n and for m
-    assert.throws(() => read_rows([['Moment', 'N'], [10, -100]]),
-                  /Spalte «m» fehlt/);
-    assert.throws(() => read_rows([['M', 'Normal'], [10, -100]]),
-                  /Spalte «n» fehlt/);
+    throwsKey(() => read_rows([['Moment', 'N'], [10, -100]]),
+              'xls.column_missing', { missing: 'm', found: '«Moment», «N»' });
+    throwsKey(() => read_rows([['M', 'Normal'], [10, -100]]),
+              'xls.column_missing', { missing: 'n' });
 });
 
 test('xls_read: a column that exists twice is rejected', () => {
-    assert.throws(() => read_rows([['n', 'm', 'N [kN]'], [-1, 2, -3]]),
-                  /«n» kommt mehrfach vor/);
-    assert.throws(() => read_rows([['n', 'm', 'M'], [-1, 2, 3]]),
-                  /«m» kommt mehrfach vor/);
+    throwsKey(() => read_rows([['n', 'm', 'N [kN]'], [-1, 2, -3]]),
+              'xls.column_twice', { name: 'n' });
+    throwsKey(() => read_rows([['n', 'm', 'M'], [-1, 2, 3]]),
+              'xls.column_twice', { name: 'm' });
 });
 
 test('xls_read: empty rows are skipped, the row number is as in Excel', () => {
@@ -133,7 +132,7 @@ test('xls_read: empty rows are skipped, the row number is as in Excel', () => {
         [null, null],
         [-1500, 'abc'],
     ]);
-    assert.throws(() => read(data, XLSX), /Zeile 4: «abc» ist keine Zahl/);
+    throwsKey(() => read(data, XLSX), 'xls.not_a_number', { row: 4, cell: 'abc' });
 
     const [x, y] = read(xlsx_file([['n', 'm'], [-1000, 100], [null, null],
                                    [-1500, -100]]), XLSX);
@@ -143,12 +142,11 @@ test('xls_read: empty rows are skipped, the row number is as in Excel', () => {
 
 test('xls_read: values are not corrected silently', () => {
     // a missing value
-    assert.throws(() => read_rows([['n', 'm'], [-1000, null]]),
-                  /Zeile 2: Ein Wert fehlt/);
+    throwsKey(() => read_rows([['n', 'm'], [-1000, null]]),
+              'xls.value_missing', { row: 2 });
     // decimal comma in a text cell: rejected with the row number and a hint
-    assert.throws(
-        () => read_rows([['n', 'm'], [-1, 2], ['-1000,5', 100]]),
-        /Zeile 3: «-1000,5» ist keine Zahl\. Zelle als Zahl formatieren\./);
+    throwsKey(() => read_rows([['n', 'm'], [-1, 2], ['-1000,5', 100]]),
+              'xls.not_a_number', { row: 3, cell: '-1000,5' });
     // a number stored as text is accepted
     const [x, y] = read_rows([['n', 'm'], ['-1000.5', ' 100 ']]);
     assert.deepEqual(x, [100]);
@@ -156,9 +154,9 @@ test('xls_read: values are not corrected silently', () => {
 });
 
 test('xls_read: empty tables are rejected', () => {
-    assert.throws(() => read_rows([]), /leer/);
-    assert.throws(() => read_rows([['n', 'm']]), /keine Werte/);
-    assert.throws(() => read_rows([['n', 'm'], [null, null]]), /keine Werte/);
+    throwsKey(() => read_rows([]), 'xls.empty_table');
+    throwsKey(() => read_rows([['n', 'm']]), 'xls.no_values');
+    throwsKey(() => read_rows([['n', 'm'], [null, null]]), 'xls.no_values');
 });
 
 test('loads: forces per metre are multiplied by the width', () => {
@@ -167,9 +165,9 @@ test('loads: forces per metre are multiplied by the width', () => {
     assert.deepEqual(n, [-100 * 0.5, -400 * 0.5]);
     // width 1 m: same numbers
     assert.deepEqual(section_forces([10], [-100], 1), [[10], [-100]]);
-    assert.throws(() => section_forces([10], [-100], 0), /Breite/);
-    assert.throws(() => section_forces([10], [-100], -1), /Breite/);
-    assert.throws(() => section_forces([10], [-100], NaN), /Breite/);
+    throwsKey(() => section_forces([10], [-100], 0), 'loads.width', { b: 0 });
+    throwsKey(() => section_forces([10], [-100], -1), 'loads.width', { b: -1 });
+    throwsKey(() => section_forces([10], [-100], NaN), 'loads.width');
 });
 
 test('loads: whole chain from the file to the load points, width not 1 m', () => {
@@ -201,7 +199,7 @@ test('loads: whole chain from the file to the load points, width not 1 m', () =>
     assert.deepEqual(n, [gamma_d * -400 / 1000, gamma_d * -390.5 / 1000]);
 
     // the width is checked only where it is used
-    assert.throws(() => load_points([10], [-100], true, 0, gamma_d), /Breite/);
+    throwsKey(() => load_points([10], [-100], true, 0, gamma_d), 'loads.width');
 });
 
 test('loads: design values are gamma_d * value / 1000', () => {

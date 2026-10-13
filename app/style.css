@@ -60,6 +60,33 @@ header a {
     display: none !important;
 }
 
+/* language switch, at the top right of both pages */
+
+.languages {
+    float: right;
+    margin-top: 8px;
+}
+
+.languages button {
+    padding: 3px 9px;
+    font: inherit;
+    font-size: 13px;
+    color: #1f4e79;
+    background: #fff;
+    border: 1px solid #1f4e79;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.languages button.active {
+    color: #fff;
+    background: #1f4e79;
+}
+
+#drop-zone button {
+    margin: 4px 6px 0 0;
+}
+
 /* landing page */
 
 .norms {

@@ -44,3 +44,22 @@ export function assertClose(actual, ref, label) {
     }
     assert.equal(actual, ref, label);
 }
+
+/**
+ * The function has to throw a TextError with this key (and these
+ * parameters). Messages are checked by their key, not by their text, so
+ * the tests do not depend on the language.
+ * @param {() => any} fn
+ * @param {string} key  key of the text in app/i18n.js
+ * @param {Object<string, any>} [params]  parameters that have to match
+ */
+export function throwsKey(fn, key, params = {}) {
+    assert.throws(fn, (/** @type {any} */ error) => {
+        assert.equal(error.name, 'TextError');
+        assert.equal(error.key, key);
+        for (const [name, value] of Object.entries(params)) {
+            assert.deepEqual(error.params[name], value, `parameter ${name}`);
+        }
+        return true;
+    });
+}

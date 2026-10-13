@@ -24,6 +24,8 @@ legacy/xls_read.py looked for the letter in the name, so a head like
 "Moment" matched both columns.
 */
 
+import { TextError } from './errors.js';
+
 /**
  * The part of the SheetJS library (vendor/xlsx.mjs) that is used here.
  * The library is passed as an argument, so this file can be type
@@ -77,9 +79,9 @@ export function column_head(head) {
     if (unit === UNITS[name].per_metre) {
         return { name: name, per_metre: true };
     }
-    const allowed = (name === 'n') ? '[kN] und [kN/m]' : '[kNm] und [kNm/m]';
-    throw new Error(`Spalte «${head.trim()}»: Die Einheit ist nicht bekannt. ` +
-                    `Zulässig sind ${allowed}.`);
+    throw new TextError((name === 'n') ? 'xls.unit_unknown_n' :
+                                         'xls.unit_unknown_m',
+                        { head: head.trim() });
 }
 
 /**
@@ -107,8 +109,7 @@ function to_number(cell, row) {
         value = Number(cell.trim());
     }
     if (!Number.isFinite(value)) {
-        throw new Error(`Zeile ${row}: «${cell}» ist keine Zahl. ` +
-                        'Zelle als Zahl formatieren.');
+        throw new TextError('xls.not_a_number', { row: row, cell: String(cell) });
     }
     return value;
 }
@@ -121,7 +122,7 @@ function to_number(cell, row) {
  */
 export function read_rows(rows) {
     if (rows.length === 0) {
-        throw new Error('Die Tabelle ist leer.');
+        throw new TextError('xls.empty_table');
     }
     const heads = rows[0];
     let column_m = -1;
@@ -135,14 +136,14 @@ export function read_rows(rows) {
         }
         if (head.name === 'm') {
             if (column_m !== -1) {
-                throw new Error('Die Spalte «m» kommt mehrfach vor.');
+                throw new TextError('xls.column_twice', { name: 'm' });
             }
             column_m = i;
             per_metre_m = head.per_metre;
         }
         if (head.name === 'n') {
             if (column_n !== -1) {
-                throw new Error('Die Spalte «n» kommt mehrfach vor.');
+                throw new TextError('xls.column_twice', { name: 'n' });
             }
             column_n = i;
             per_metre_n = head.per_metre;
@@ -152,15 +153,13 @@ export function read_rows(rows) {
         const missing = (column_n === -1) ? 'n' : 'm';
         const found = heads.filter(head => !is_empty(head))
             .map(head => `«${head}»`).join(', ');
-        throw new Error(`Die Spalte «${missing}» fehlt. ` +
-                        'Erwartet werden die Spaltenköpfe «n» und «m». ' +
-                        `Gefunden: ${found}.`);
+        throw new TextError('xls.column_missing',
+                            { missing: missing, found: found });
     }
     if (per_metre_m !== per_metre_n) {
-        throw new Error('Die Einheiten passen nicht zusammen: ' +
-                        `«${String(heads[column_n]).trim()}» und ` +
-                        `«${String(heads[column_m]).trim()}». ` +
-                        'Entweder beide Spalten pro Meter oder keine.');
+        throw new TextError('xls.units_mixed',
+                            { n: String(heads[column_n]).trim(),
+                              m: String(heads[column_m]).trim() });
     }
 
     /** @type {number[]} */
@@ -176,14 +175,13 @@ export function read_rows(rows) {
             continue;
         }
         if (is_empty(cell_m) || is_empty(cell_n)) {
-            throw new Error(`Zeile ${row}: Ein Wert fehlt ` +
-                            '(n und m müssen beide angegeben sein).');
+            throw new TextError('xls.value_missing', { row: row });
         }
         x.push(to_number(cell_m, row));
         y.push(to_number(cell_n, row));
     }
     if (x.length === 0) {
-        throw new Error('Die Tabelle enthält keine Werte.');
+        throw new TextError('xls.no_values');
     }
     return [x, y, per_metre_n];
 }

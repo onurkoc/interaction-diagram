@@ -10,7 +10,7 @@ import { int_diagram, min_eccentricity_moments } from '../app/core.js';
 import { cult_I, cult_I_min_eccentricity } from '../app/cult_i.js';
 import { en1992 } from '../app/norms/en1992.js';
 import { sia262 } from '../app/norms/sia262.js';
-import { assertClose } from './helpers.js';
+import { assertClose, throwsKey } from './helpers.js';
 
 /**
  * CULT-I from its four distances, normalised form (N13 in NOTES.md):
@@ -57,21 +57,22 @@ test('E1: minimum eccentricity is the larger of h/30 and 20 mm', () => {
 
 test('E6: f_ck above 50 is rejected in both norms (D4)', () => {
     assert.notEqual(int_diagram({ f_ck: 50 }), null);
-    assert.throws(() => int_diagram({ f_ck: 55 }), /f_ck/);
+    throwsKey(() => int_diagram({ f_ck: 55 }), 'norm.f_ck_max',
+              { f_ck: 55, f_ck_max: 50, norm: 'EN 1992-1-1' });
     assert.notEqual(int_diagram({ f_ck: 50, eta_t: 0.85 }, sia262), null);
-    assert.throws(() => int_diagram({ f_ck: 55, eta_t: 0.85 }, sia262),
-                  /f_ck/);
+    throwsKey(() => int_diagram({ f_ck: 55, eta_t: 0.85 }, sia262),
+              'norm.f_ck_max', { norm: 'SIA 262:2025' });
 });
 
 test('E5/E6: alpha_cc outside 0.8 to 1.0 is rejected, not corrected', () => {
-    assert.throws(() => int_diagram({ alpha_cc: 0.7 }), /alpha_cc/);
-    assert.throws(() => int_diagram({ alpha_cc: 1.1 }), /alpha_cc/);
+    throwsKey(() => int_diagram({ alpha_cc: 0.7 }), 'norm.alpha_cc', { alpha_cc: 0.7 });
+    throwsKey(() => int_diagram({ alpha_cc: 1.1 }), 'norm.alpha_cc', { alpha_cc: 1.1 });
 });
 
 test('E6: eta_t other than 1.0 / 0.85 / 1.2 is rejected (SIA)', () => {
-    assert.throws(() => int_diagram({ f_ck: 30, eta_t: 0.9 }, sia262),
-                  /eta_t/);
-    assert.throws(() => int_diagram({ f_ck: 30 }, sia262), /eta_t/);
+    throwsKey(() => int_diagram({ f_ck: 30, eta_t: 0.9 }, sia262),
+              'norm.eta_t', { eta_t: 0.9 });
+    throwsKey(() => int_diagram({ f_ck: 30 }, sia262), 'norm.eta_t');
 });
 
 test('E10/D7: plain concrete section uses the reduced f_cd', () => {
