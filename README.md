@@ -5,6 +5,13 @@ reinforced concrete cross-sections, with the index CULT-I for tunnel
 linings. Everything is calculated in the browser; the load file is not
 uploaded.
 
+**Open the app: <https://interaction-diagram.onurkoc.net/>**
+
+![The app with invented load points](images/app.png)
+
+The picture shows the example values of the app with invented load
+points, not a project.
+
 Two design codes can be chosen:
 
 - **SIA 262:2025**
@@ -38,16 +45,19 @@ The most important ones:
   a conservative assumption.
 - Plain concrete (a_s1 = a_s2 = 0): reduced design strength, see NOTES.md.
 
-The curve with reinforcement was compared with commercial program for one section
-(SIA 262, see NOTES.md section 6). CULT-I is covered by rule tests only,
-not yet by a comparison with independent numbers.
+**Validation status.** The curve with reinforcement was compared with
+commercial program for one section, for SIA 262 and symmetric reinforcement only (see
+NOTES.md section 6). EN 1992-1-1, asymmetric reinforcement, plain
+concrete, the radial utilization and CULT-I are covered by rule tests
+only, not yet by a comparison with independent numbers. The app shows
+this note on its first page and below the calculator.
 
 ## How to use it
 
-0. Open the app. Locally: double-click `start.cmd` (Windows, needs
-   Python 3) or run `npx http-server app -c-1`, see
-   [Running it locally](#running-it-locally). A link to the app on the
-   web follows.
+0. Open the app at <https://interaction-diagram.onurkoc.net/>. Locally:
+   double-click `start.cmd` (Windows, needs Python 3) or run
+   `npx http-server app -c-1`, see
+   [Running it locally](#running-it-locally).
 1. Choose the code on the first page. It can be changed at any time; the
    input is kept where it is valid for both codes.
 2. Enter the cross-section and the materials. These fields have no preset
@@ -294,10 +304,12 @@ app/                the static app
   loads.js          width and load factor
   norms/            configuration of SIA 262 and EN 1992-1-1
   vendor/           Plotly.js, SheetJS (with their licences)
+  _headers          cache rules for Cloudflare Pages
 start.cmd, serve.py starts the app locally (Python 3)
 legacy/             the original Python code of 2020 (Dash), reference only
 tests/              tests, run with node
 NOTES.md            assumptions, findings and decisions (German)
+DEPLOY.md           hosting on Cloudflare Pages (German)
 ```
 
 Tests and type check (tested with Node.js 24):
