@@ -669,8 +669,9 @@ export function hints(norm, result, loads, t, { cult = false, radial = false } =
     } else {
         list.push(t('norm.note.second_order'));
     }
-    // decision D3
-    list.push(t('hint.steel', { limit: t.fmt(norm.eps_s_max * 1000, 0) }));
+    // decision D3: what the code allows, and the limit of this app
+    list.push(t((norm === sia262) ? 'hint.steel.sia262' : 'hint.steel.en1992',
+                { limit: t.fmt(norm.eps_s_max * 1000, 0) }));
     if (result.e0 !== null) {
         list.push(t('hint.min_eccentricity',
                     { e0: t.fmt(result.e0 * 1000, 1) }));

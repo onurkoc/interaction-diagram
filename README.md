@@ -44,8 +44,10 @@ The most important ones:
 - Concrete: parabola-rectangle diagram with 2 ‰ and 3,5 ‰, no tensile
   strength. In the SIA mode this is equation (27) of SIA 262 with
   k_σ = 2, a deliberate simplification.
-- Reinforcing steel: ideal plastic, E_s = 200 GPa, steel strain limited to
-  12 ‰ (permitted, not required by the codes).
+- Reinforcing steel: horizontal top branch (ideally plastic),
+  E_s = 200 GPa. Neither code requires a strain limit for this branch
+  (EN 1992-1-1 3.2.7 (2) b; SIA 262 4.2.2.5, 4.2.2.6). Assumption of this
+  app: steel strain limited to 12 ‰.
 - Strain planes with the pivot points A, B and C (EN 1992-1-1 6.1 (5),
   Figure 6.1). SIA 262 does not regulate pivot C; the app uses it there as
   a conservative assumption.

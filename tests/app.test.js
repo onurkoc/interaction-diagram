@@ -879,7 +879,9 @@ test('hints: norm, simplifications and the handling of the file', () => {
                            'hint.pivot_c', 'hint.sign', 'hint.cult']) {
             assert.ok(lines.includes(t(key)), key);
         }
-        assert.ok(lines.includes(t('hint.steel', { limit: '12' })));
+        assert.ok(lines.includes(t('hint.steel.sia262', { limit: '12' })));
+        // the text of the other norm is not shown
+        assert.ok(!lines.includes(t('hint.steel.en1992', { limit: '12' })));
         assert.ok(lines.includes(t('hint.per_metre', { b: 0.5 })));
         assert.ok(lines.includes(t('hint.loads', { name: 'test.xlsx', count: 1,
                                                     gamma_d: 1.35 })));
@@ -904,6 +906,9 @@ test('hints: norm, simplifications and the handling of the file', () => {
         assert.ok(en_lines.includes(t('norm.note.second_order')));
         assert.equal(en_lines.includes(t('norm.note.k_sigma')), false);
         assert.equal(en_lines.includes(t('hint.pivot_c')), false);
+        assert.ok(en_lines.includes(t('hint.steel.en1992', { limit: '12' })));
+        assert.equal(en_lines.includes(t('hint.steel.sia262', { limit: '12' })),
+                     false);
         assert.equal(en_lines.includes(t('hint.cult')), false);
     }
     // decimal sign of the language in the hints
