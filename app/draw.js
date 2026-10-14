@@ -168,9 +168,8 @@ export function figure(i_val, val, norm, points, t,
         val['Moment Neg'].slice().reverse()));
     const concrete_y = kilo(val['Normal Force'].concat(
         val['Normal Force Neg'].slice().reverse()));
-    const h_b = `h = ${t.num(i_val['h'])} m<br>b = ${t.num(i_val['b'])} m<br>`;
-    const section = h_b +
-        `d_1 = ${t.num(i_val['d_1'])} m<br>d_2 = ${t.num(i_val['d_2'])} m<br>`;
+    // the concrete curve depends on f_cd, h and b only
+    const section = `h = ${t.num(i_val['h'])} m<br>b = ${t.num(i_val['b'])} m<br>`;
     const f_cd = { f_cd: t.fmt(i_val['f_cd'], 2) };
     let name_concrete;
     if (i_val['plain']) {
@@ -178,9 +177,8 @@ export function figure(i_val, val, norm, points, t,
         name_concrete = `${t('draw.concrete_plain')}<br>` +
             `${t('draw.f_cd_reduced', f_cd)}<br>` + section;
     } else {
-        // comparison line: only what the concrete curve depends on
         name_concrete = `${t('draw.concrete_comparison')}<br>` +
-            `${t('draw.f_cd', f_cd)}<br>` + h_b;
+            `${t('draw.f_cd', f_cd)}<br>` + section;
     }
     // The governing curve is drawn solid and strong: the curve with
     // reinforcement, or the concrete curve of a plain section. With
