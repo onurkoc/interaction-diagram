@@ -2,7 +2,7 @@
 
 Fachliche Annahmen, Vereinfachungen und offene Punkte der App.
 Normbezüge nur als Ziffern (EN 1992-1-1:2004 + AC:2010 + A1:2014,
-SIA 262:2025, SIA 197:2023). D1–D7 sind Entscheide von Onur Koc.
+SIA 262:2025, SIA 197:2023). D1–D8 sind Entscheide von Onur Koc.
 
 ## 1 Anwendungsbereich
 
@@ -97,6 +97,7 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 | D5 | Drehpunkt C auch im SIA-Modus, als konservative Annahme analog EN. |
 | D6 | Vergleich eines Querschnitts mit commercial program nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
 | D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
+| D8 | Mindestausmitte im EN-Modus mit Vorgabe «ein» (Checkbox beim Start eingeschaltet), weil EN 1992-1-1 6.1 (4) sie «in der Regel» verlangt. Abschalten ist eine bewusste Abweichung des Anwenders. Im SIA-Modus keine Mindestausmitte (unverändert, D1). Entscheid Onur 2026-10-14, umgesetzt in `744d9ea`. |
 
 Reihenfolge der Korrekturen, je ein eigener Commit:
 
