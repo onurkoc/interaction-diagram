@@ -41,7 +41,7 @@ export const TEXTS = {
 
         // inputs
         'section.legend': 'Querschnitt',
-        'section.no_presets': 'Keine Vorgabewerte: alle Felder ausfüllen.',
+        'section.no_presets': 'Keine Vorgabewerte – alle Werte sind einzugeben.',
         'section.sign': 'Positives Moment: Zug auf der Seite von a_s1.',
         'example.load': 'Beispiel laden',
         'example.loaded': 'Beispielwerte geladen –',
@@ -132,7 +132,8 @@ export const TEXTS = {
         'draw.min_eccentricity': 'Mindestausmitte M = ±e0·N',
         'draw.points_inside': 'Lastpunkte innerhalb: {count} von {total}',
         'draw.points_outside': 'Lastpunkte ausserhalb der Kurve: {count} von {total}',
-        'draw.design_values': 'Bemessungswerte, γ_d = {gamma_d}',
+        'draw.design_values': 'Lastpunkte × γ_d = {gamma_d} (Bemessungswerte)',
+        'draw.design_values_read': 'Lastpunkte als Bemessungswerte eingelesen',
         'draw.max_utilization': 'max. Ausnutzung radial: {value}',
         'draw.min_cult': 'min. CULT-I: {value}',
         'draw.points_moved': 'Lastpunkte mit Mindestausmitte',
@@ -221,7 +222,7 @@ export const TEXTS = {
 
         // inputs
         'section.legend': 'Cross-section',
-        'section.no_presets': 'No preset values: fill in all fields.',
+        'section.no_presets': 'No preset values – all values have to be entered.',
         'section.sign': 'Positive moment: tension on the side of a_s1.',
         'example.load': 'Load example',
         'example.loaded': 'Example values loaded –',
@@ -312,7 +313,8 @@ export const TEXTS = {
         'draw.min_eccentricity': 'Minimum eccentricity M = ±e0·N',
         'draw.points_inside': 'Load points inside: {count} of {total}',
         'draw.points_outside': 'Load points outside of the curve: {count} of {total}',
-        'draw.design_values': 'Design values, γ_d = {gamma_d}',
+        'draw.design_values': 'Load points × γ_d = {gamma_d} (design values)',
+        'draw.design_values_read': 'Load points read as design values',
         'draw.max_utilization': 'max. radial utilization: {value}',
         'draw.min_cult': 'min. CULT-I: {value}',
         'draw.points_moved': 'Load points with minimum eccentricity',

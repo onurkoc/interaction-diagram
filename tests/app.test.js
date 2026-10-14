@@ -594,7 +594,10 @@ test('figure: curves, the legend shows the f_cd that was used (N6)', () => {
         assert.ok(comparison.name.startsWith(
             `${t('draw.concrete_comparison')}<br>` +
             `${t('draw.f_cd', { f_cd: t.fmt(17, 2) })}<br>` +
-            `h = ${t.num(0.3)} m<br>b = 1 m<br>d_1 = ${t.num(0.05)} m`));
+            `h = ${t.num(0.3)} m<br>b = 1 m<br>`));
+        // the comparison line does not depend on the reinforcement
+        assert.ok(!comparison.name.includes('d_1'));
+        assert.ok(!comparison.name.includes('d_2'));
         assert.ok(governing.name.startsWith(`${t('draw.reinforced')}<br>`));
         // the curve with reinforcement governs: solid and stronger than the
         // comparison line
@@ -654,7 +657,7 @@ test('figure: load points inside and outside are two traces with their numbers',
         assert.equal(fig.data.length, 4);
         assert.ok(inside.name.startsWith(
             en('draw.points_inside', { count: 2, total: 4 }) + '<br>' +
-            en('draw.design_values', { gamma_d: 1 })));
+            en('draw.design_values_read')));
         assert.ok(outside.name.startsWith(
             en('draw.points_outside', { count: 2, total: 4 }) + '<br>'));
         // in kNm
@@ -678,6 +681,21 @@ test('figure: load points inside and outside are two traces with their numbers',
     assert.equal(names.length, 3);
     assert.ok(names[2].startsWith(
         de('draw.points_inside', { count: 1, total: 1 })));
+});
+
+test('figure: legend of the load points names the factor gamma_d', () => {
+    const { params } = check_inputs(raw({ gamma_d: '1.35' }), en1992);
+    const result = calculate(params, en1992, loads_of([10], [-1000]));
+    for (const lang of LANGUAGES) {
+        const t = translator(lang);
+        const fig = figure(result.input_values, result.values, en1992,
+                           result.points, t);
+        const points = /** @type {any} */ (fig.data[2]);
+        assert.ok(points.name.includes(
+            t('draw.design_values', { gamma_d: 1.35 })));
+        assert.ok(points.name.includes(`1${t.decimal}35`));
+        assert.ok(!points.name.includes(t('draw.design_values_read')));
+    }
 });
 
 test('figure: load points, ray of the minimum eccentricity (D1)', () => {

@@ -168,7 +168,8 @@ export function figure(i_val, val, norm, points, t,
         val['Moment Neg'].slice().reverse()));
     const concrete_y = kilo(val['Normal Force'].concat(
         val['Normal Force Neg'].slice().reverse()));
-    const section = `h = ${t.num(i_val['h'])} m<br>b = ${t.num(i_val['b'])} m<br>` +
+    const h_b = `h = ${t.num(i_val['h'])} m<br>b = ${t.num(i_val['b'])} m<br>`;
+    const section = h_b +
         `d_1 = ${t.num(i_val['d_1'])} m<br>d_2 = ${t.num(i_val['d_2'])} m<br>`;
     const f_cd = { f_cd: t.fmt(i_val['f_cd'], 2) };
     let name_concrete;
@@ -177,8 +178,9 @@ export function figure(i_val, val, norm, points, t,
         name_concrete = `${t('draw.concrete_plain')}<br>` +
             `${t('draw.f_cd_reduced', f_cd)}<br>` + section;
     } else {
+        // comparison line: only what the concrete curve depends on
         name_concrete = `${t('draw.concrete_comparison')}<br>` +
-            `${t('draw.f_cd', f_cd)}<br>` + section;
+            `${t('draw.f_cd', f_cd)}<br>` + h_b;
     }
     // The governing curve is drawn solid and strong: the curve with
     // reinforcement, or the concrete curve of a plain section. With
@@ -262,8 +264,10 @@ export function figure(i_val, val, norm, points, t,
         const inside = numbered.filter(entry => entry.p.inside);
         const outside = numbered.filter(entry => !entry.p.inside);
         const total = points.length;
-        const design_values = t('draw.design_values',
-                                { gamma_d: i_val['gamma_d'] });
+        // the points are the values of the file times gamma_d (loads.js)
+        const design_values = i_val['gamma_d'] === 1
+            ? t('draw.design_values_read')
+            : t('draw.design_values', { gamma_d: i_val['gamma_d'] });
 
         if (inside.length > 0) {
             let name_inside = t('draw.points_inside',
