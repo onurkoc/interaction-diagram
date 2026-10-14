@@ -725,15 +725,25 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
         const fig = figure(result.input_values, result.values, en1992,
                            result.points, t, { e0: result.e0 });
         const names = fig.data.map(trace => /** @type {any} */ (trace).name);
-        assert.equal(names.length, 5);
+        assert.equal(names.length, 6);
         assert.equal(names[2], `${t('draw.min_eccentricity')}<br>` +
                                `e0 = ${t.fmt(0.02, 3)} m<br>`);
-        assert.ok(names[3].startsWith(
+        assert.ok(names[4].startsWith(
             t('draw.points_inside', { count: 2, total: 2 })));
-        assert.ok(names[3].includes(t('draw.min_cult', { value: '' }).trim()));
-        assert.equal(names[4], t('draw.points_moved'));
+        assert.ok(names[4].includes(t('draw.min_cult', { value: '' }).trim()));
+        // the legend says where the moved points are assessed
+        assert.equal(names[5], `${t('draw.points_moved')}<br>` +
+                               t('draw.assessed_moved'));
         // the original points stay, only the moved point is drawn again
-        const [, , ray, original, moved] = /** @type {any[]} */ (fig.data);
+        const [, , ray, link, original, moved] = /** @type {any[]} */ (fig.data);
+        // thin line from the original to the moved point, below the
+        // points, not in the legend, same colour as the hollow diamond
+        assert.deepEqual(link.x, [10, 20, null]);
+        assert.deepEqual(link.y, [-1000, -1000, null]);
+        assert.equal(link.mode, 'lines');
+        assert.equal(link.showlegend, false);
+        assert.equal(link.line.color, moved.marker.line.color);
+        assert.equal(fig.legend_lines.length, names.length - 1);
         assert.deepEqual(original.x, [10, 100]);
         assert.deepEqual(original.y, [-1000, -1000]);
         assert.deepEqual(moved.x, [20]);
@@ -752,7 +762,9 @@ test('figure: load points, ray of the minimum eccentricity (D1)', () => {
         assert.equal(/** @type {any} */ (fig.layout).showlegend, undefined);
         assert.equal(/** @type {any} */ (narrow.layout).showlegend, false);
         assert.equal(/** @type {any} */ (narrow.layout).title.text, 'EN 1992-1-1');
-        assert.equal(narrow.legend_lines.length, narrow.data.length);
+        // every trace of the legend, not the line to the moved point
+        assert.equal(narrow.legend_lines.length, narrow.data.filter(
+            trace => /** @type {any} */ (trace).showlegend !== false).length);
         const colours = ['colour.comparison', 'colour.governing', 'colour.ray',
                          'colour.inside', 'colour.moved'];
         narrow.legend_lines.forEach((line, i) => {
@@ -944,7 +956,8 @@ test('hover text, table and core give the same CULT-I for every point', () => {
         /** @type {Map<number, string>} */
         const hover = new Map();
         for (const trace of /** @type {any[]} */ (fig.data)) {
-            if (trace.mode !== 'markers' || trace.name === en('draw.points_moved')) {
+            if (trace.mode !== 'markers' ||
+                trace.name.startsWith(en('draw.points_moved'))) {
                 continue;
             }
             for (const text of trace.text) {
