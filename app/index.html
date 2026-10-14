@@ -192,11 +192,11 @@
 </main>
 
 <!-- libraries, stored locally (no CDN) -->
-<script src="vendor/plotly-basic.min.js"></script>
+<script src="vendor/plotly-basic-4.1.2.min.js"></script>
 <script type="module">
-    import * as XLSX from './vendor/xlsx.mjs';
+    import * as XLSX from './vendor/xlsx-0.20.3.mjs';
     import { start } from './app.js';
-    // plotly-basic.min.js is a classic script and sets window.Plotly
+    // plotly-basic-4.1.2.min.js is a classic script and sets window.Plotly
     start({ XLSX: XLSX, Plotly: window.Plotly });
     window.app_started = true;
 </script>

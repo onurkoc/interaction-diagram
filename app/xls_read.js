@@ -27,7 +27,7 @@ legacy/xls_read.py looked for the letter in the name, so a head like
 import { TextError } from './errors.js';
 
 /**
- * The part of the SheetJS library (vendor/xlsx.mjs) that is used here.
+ * The part of the SheetJS library (vendor/xlsx-0.20.3.mjs) that is used here.
  * The library is passed as an argument, so this file can be type
  * checked without the library.
  * @typedef {Object} XlsxLibrary
