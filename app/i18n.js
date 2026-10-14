@@ -23,12 +23,12 @@ export const TEXTS = {
         'landing.intro': 'Querschnittsnachweis für Stahlbeton-Rechteckquerschnitte (Spritzbetonschalen) mit Ausnutzung und CULT-I. Nicht für Druckglieder mit Effekten 2. Ordnung.',
         'landing.choose': 'Norm wählen',
         'landing.sia': 'f_cd mit η_fc und η_t, keine Mindestausmitte',
-        'landing.en': 'ohne Nationalen Anhang (empfohlene Werte)',
+        'landing.en': 'ohne Nationalen Anhang (empfohlene Werte), Mindestausmitte e0 = max(h/30; 20 mm) wählbar (6.1 (4))',
         'norm.sia262.label': 'SIA 262:2025',
         'norm.en1992.label': 'EN 1992-1-1 ohne Nationalen Anhang (empfohlene Werte)',
         'header.change_norm': 'Norm wechseln',
         'footer.source': 'Quellcode',
-        'validation.note': 'Stand der Validierung: Die Kurve mit Bewehrung ist mit Fagus verglichen, nur für SIA 262 und symmetrische Bewehrung (ein Querschnitt). EN 1992-1-1, unsymmetrische Bewehrung, unbewehrter Querschnitt, Ausnutzung radial und CULT-I sind nur durch Regel-Tests gedeckt.',
+        'validation.note': 'Stand der Validierung: Die Kurve mit Bewehrung ist mit Fagus verglichen, nur für SIA 262 und symmetrische Bewehrung (ein Querschnitt). EN 1992-1-1, unsymmetrische Bewehrung, unbewehrter Querschnitt, Ausnutzung radial und CULT-I sind nur durch automatische Tests geprüft, nicht mit einem unabhängigen Programm verglichen.',
 
         // file
         'file.label': 'Excel-Datei mit den Lastpunkten hierher ziehen oder auswählen:',
@@ -204,12 +204,12 @@ export const TEXTS = {
         'landing.intro': 'Cross-section check of rectangular reinforced concrete sections (shotcrete linings) with utilization and CULT-I. Not for compression members with second order effects.',
         'landing.choose': 'Choose the code',
         'landing.sia': 'f_cd with η_fc and η_t, no minimum eccentricity',
-        'landing.en': 'without National Annex (recommended values)',
+        'landing.en': 'without National Annex (recommended values), minimum eccentricity e0 = max(h/30; 20 mm) selectable (6.1 (4))',
         'norm.sia262.label': 'SIA 262:2025',
         'norm.en1992.label': 'EN 1992-1-1 without National Annex (recommended values)',
         'header.change_norm': 'Change code',
         'footer.source': 'Source code',
-        'validation.note': 'Validation status: the curve with reinforcement was compared with Fagus, for SIA 262 and symmetric reinforcement only (one cross-section). EN 1992-1-1, asymmetric reinforcement, plain concrete, radial utilization and CULT-I are covered by rule tests only.',
+        'validation.note': 'Validation status: the curve with reinforcement was compared with Fagus, for SIA 262 and symmetric reinforcement only (one cross-section). EN 1992-1-1, asymmetric reinforcement, plain concrete, radial utilization and CULT-I are only covered by automated tests, not compared with an independent program.',
 
         // file
         'file.label': 'Drop the Excel file with the load points here or choose it:',
