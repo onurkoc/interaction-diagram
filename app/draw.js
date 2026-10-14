@@ -231,6 +231,33 @@ export function figure(i_val, val, norm, points, t,
         });
     }
 
+    // points moved by the minimum eccentricity: they are assessed at the
+    // moved point (m_mod, n), drawn as a hollow diamond
+    const moved = points.filter(p => p.modified);
+    const MOVED_COLOUR = '#555';
+    if (moved.length > 0) {
+        // thin line from each original point to its moved point; below the
+        // markers and not in the legend (not with add)
+        /** @type {(number | null)[]} */
+        const link_x = [];
+        /** @type {(number | null)[]} */
+        const link_y = [];
+        for (const p of moved) {
+            link_x.push(p.m * 1000, p.m_mod * 1000, null);
+            link_y.push(p.n * 1000, p.n * 1000, null);
+        }
+        data.push({
+            type: 'scatter',
+            x: link_x,
+            y: link_y,
+            mode: 'lines',
+            name: '',
+            line: { color: MOVED_COLOUR, width: 1 },
+            showlegend: false,
+            hoverinfo: 'skip',
+        });
+    }
+
     if (points.length > 0) {
         // Two traces: points inside and points outside of the curve, so
         // that the legend says how many there are of each.
@@ -325,20 +352,18 @@ export function figure(i_val, val, norm, points, t,
             });
         }
 
-        // points moved by the minimum eccentricity
-        const moved = points.filter(p => p.modified);
         if (moved.length > 0) {
             add('colour.moved', {
                 type: 'scatter',
                 x: kilo(moved.map(p => p.m_mod)),
                 y: kilo(moved.map(p => p.n)),
                 mode: 'markers',
-                name: t('draw.points_moved'),
+                name: `${t('draw.points_moved')}<br>${t('draw.assessed_moved')}`,
                 marker: {
                     color: 'rgba(0, 0, 0, 0)',
                     size: 8,
                     symbol: 'diamond',
-                    line: { color: '#555', width: 1.5 },
+                    line: { color: MOVED_COLOUR, width: 1.5 },
                 },
                 text: moved.map(p =>
                     t('draw.m_mod', { value: t.fmt(p.m_mod * 1000, 2) }) +

@@ -2,7 +2,7 @@
 
 Fachliche Annahmen, Vereinfachungen und offene Punkte der App.
 Normbezüge nur als Ziffern (EN 1992-1-1:2004 + AC:2010 + A1:2014,
-SIA 262:2025, SIA 197:2023). D1–D7 sind Entscheide von Onur Koc.
+SIA 262:2025, SIA 197:2023). D1–D8 sind Entscheide von Onur Koc.
 
 ## 1 Anwendungsbereich
 
@@ -92,11 +92,12 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 |---|---|
 | D1 | Mindestausmitte EN 6.1 (4) auf die Lastpunkte anwenden, nicht auf die Widerstandskurve: M_Ed,mod = sign(M_Ed) · max(\|M_Ed\|, e0 · \|N_Ed\|), e0 = max(h/30; 20 mm), nur bei Druck; bei M_Ed = 0 beide Vorzeichen prüfen. CULT-I mit den modifizierten Lastpunkten. Die alte Kappung der Kurve entfällt. Nur im EN-Modus. |
 | D2 | Dehnungsebenen nach Bild 6.1 (Drehpunkte A, B, C), C bei (1 − εc2/εcu2)·h. |
-| D3 | Stahldehnungsgrenze 12 ‰ bleibt, horizontaler Ast. |
+| D3 | Stahldehnungsgrenze 12 ‰ bleibt, horizontaler Ast. Ergänzt 2026-10-14: Beide Normen verlangen für den horizontalen Ast keine Dehnungsgrenze (EN 1992-1-1 3.2.7 (2) b; SIA 262:2025 4.2.2.5 / 4.2.2.6, eine Grenze ε_ud nach Tabelle 9 nur bei linearer Verfestigung). Die 12 ‰ sind eine Annahme aus `legacy/core.py`, kein Normwert; die Oberfläche nennt sie «Annahme dieser App». Offen: SIA 262 Figur 16 ist im Vault nicht als Bild vorhanden, Prüfung durch Onur. |
 | D4 | f_ck ≤ 50 MPa in beiden Modi; Eingabe darüber mit Meldung ablehnen. |
 | D5 | Drehpunkt C auch im SIA-Modus, als konservative Annahme analog EN. |
 | D6 | Vergleich eines Querschnitts mit commercial program nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
 | D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
+| D8 | Mindestausmitte im EN-Modus mit Vorgabe «ein» (Checkbox beim Start eingeschaltet), weil EN 1992-1-1 6.1 (4) sie «in der Regel» verlangt. Abschalten ist eine bewusste Abweichung des Anwenders. Im SIA-Modus keine Mindestausmitte (unverändert, D1). Entscheid Onur 2026-10-14, umgesetzt in `744d9ea`. |
 
 Reihenfolge der Korrekturen, je ein eigener Commit:
 

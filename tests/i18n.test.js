@@ -115,6 +115,16 @@ test('i18n: no German text is left in the code of the app', () => {
     }
 });
 
+test('i18n: a clause and its paragraph are not split at the line end', () => {
+    // e.g. 6.1 (4): no-break space between the number and the paragraph
+    for (const lang of LANGUAGES) {
+        for (const [key, text] of Object.entries(TEXTS[lang])) {
+            assert.doesNotMatch(text, /\d \(\d+\)/, `${lang}: ${key}`);
+        }
+    }
+    assert.doesNotMatch(source('index.html'), /\d \(\d+\)/);
+});
+
 test('translator: parameters and numbers in the decimal sign of the language', () => {
     const de = translator('de');
     const en = translator('en');

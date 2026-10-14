@@ -7,6 +7,11 @@ uploaded.
 
 **Open the app: <https://interaction-diagram.onurkoc.net/>**
 
+Validation status: the curve with reinforcement was compared with commercial program
+for SIA 262 and symmetric reinforcement only. Everything else is only
+covered by automated tests, not compared with an independent program
+(details below).
+
 ![The app with invented load points](images/app.png)
 
 The picture shows the example values of the app with invented load
@@ -15,7 +20,8 @@ points, not a project.
 Two design codes can be chosen:
 
 - **SIA 262:2025**
-- **EN 1992-1-1** without National Annex (recommended values)
+- **EN 1992-1-1** without National Annex (recommended values), minimum
+  eccentricity e0 = max(h/30; 20 mm) selectable (6.1 (4))
 
 The interface is in German and English (switch DE | EN at the top right).
 A new visitor gets German if the browser is set to German, otherwise
@@ -38,8 +44,10 @@ The most important ones:
 - Concrete: parabola-rectangle diagram with 2 ‰ and 3,5 ‰, no tensile
   strength. In the SIA mode this is equation (27) of SIA 262 with
   k_σ = 2, a deliberate simplification.
-- Reinforcing steel: ideal plastic, E_s = 200 GPa, steel strain limited to
-  12 ‰ (permitted, not required by the codes).
+- Reinforcing steel: horizontal top branch (ideally plastic),
+  E_s = 200 GPa. Neither code requires a strain limit for this branch
+  (EN 1992-1-1 3.2.7 (2) b; SIA 262 4.2.2.5, 4.2.2.6). Assumption of this
+  app: steel strain limited to 12 ‰.
 - Strain planes with the pivot points A, B and C (EN 1992-1-1 6.1 (5),
   Figure 6.1). SIA 262 does not regulate pivot C; the app uses it there as
   a conservative assumption.
@@ -48,8 +56,8 @@ The most important ones:
 **Validation status.** The curve with reinforcement was compared with
 commercial program for one section, for SIA 262 and symmetric reinforcement only (see
 NOTES.md section 6). EN 1992-1-1, asymmetric reinforcement, plain
-concrete, the radial utilization and CULT-I are covered by rule tests
-only, not yet by a comparison with independent numbers. The app shows
+concrete, the radial utilization and CULT-I are only covered by
+automated tests, not compared with an independent program. The app shows
 this note on its first page and below the calculator.
 
 ## How to use it
@@ -106,8 +114,10 @@ twice.
 
 ### Minimum eccentricity (EN mode only)
 
-With the option switched on, every load point with compression is checked
-with the moment M_Ed,mod = max(|M_Ed|; e0 · |N_Ed|), e0 = max(h/30; 20 mm)
+The option is switched on by default, because 6.1 (4) asks for the
+minimum eccentricity as a rule. With the option on, every load point
+with compression is checked with the moment
+M_Ed,mod = max(|M_Ed|; e0 · |N_Ed|), e0 = max(h/30; 20 mm)
 (EN 1992-1-1 6.1 (4)). For M_Ed = 0 both signs are checked. The capacity
 curve is not changed; the rays M = ±e0 · N are drawn, and the table shows
 the original and the modified moment. SIA 262 has no such rule for
