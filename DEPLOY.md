@@ -90,8 +90,11 @@ Voraussetzung: `onurkoc.net` liegt als Zone im selben Cloudflare-Konto.
 3. Cloudflare legt den DNS-Eintrag (CNAME auf `<projekt>.pages.dev`)
    selbst an und stellt das Zertifikat aus. Warten, bis der Status
    «aktiv» ist.
-4. `https://interaction-diagram.onurkoc.net/` öffnen und die Prüfliste
-   noch einmal durchgehen.
+4. In der Zone `onurkoc.net` die Cache Rule für den Hostnamen prüfen
+   bzw. den Hostnamen aufnehmen, siehe
+   [Eigene Domain: Zone überschreibt `_headers`](#eigene-domain-zone-überschreibt-_headers).
+5. `https://interaction-diagram.onurkoc.net/` öffnen und die Prüfliste
+   noch einmal durchgehen, mit `curl -sI` für die Köpfe (Punkt 2).
 
 Den CNAME nicht von Hand im DNS anlegen, ohne die Domain im
 Pages-Projekt einzutragen: Die Adresse antwortet dann mit einem Fehler.
@@ -119,6 +122,39 @@ Zwei Regeln, die beim Ändern zu beachten sind:
 
 `_headers` gilt nur auf Cloudflare Pages. Lokal sendet `serve.py` für
 alle Dateien `Cache-Control: no-store`.
+
+### Eigene Domain: Zone überschreibt `_headers`
+
+Auf `<projekt>.pages.dev` kommen die Köpfe so, wie `_headers` sie
+setzt. Über die eigene Domain läuft die Antwort zusätzlich durch die
+Zone `onurkoc.net`, und dort gilt die Einstellung **Browser Cache TTL**
+(Vorgabe von Cloudflare: 4 Stunden). Ist der `Cache-Control` der Quelle
+kürzer, ersetzt Cloudflare ihn; `no-cache` wird so zu
+`max-age=14400`. Betroffen sind Dateien, die Cloudflare als statisch
+ansieht (`.js`, `.css`), nicht die Seite selbst.
+
+Folge (gesehen am 2026-10-14): Die neue `index.html` kam an, `app.js`,
+`draw.js` usw. nahm der Browser aber bis zu 4 h aus seinem Cache. Im
+privaten Fenster war der neue Stand zu sehen, im normalen nicht.
+
+Lösung: In der Zone `onurkoc.net` eine **Cache Rule je Hostname**
+(Caching → Cache Rules), Bedingung Hostname gleich
+`interaction-diagram.onurkoc.net`, Browser TTL «Respect origin», Edge
+TTL «Cache-Control der Quelle». Die Zonen-Einstellung selbst bleibt
+unverändert, andere Subdomains sind nicht betroffen.
+
+- **Neue App unter einer weiteren Subdomain:** ihren Hostnamen in
+  dieselbe Regel aufnehmen (Bedingung «Hostname ist eines von …»).
+- **Nach jeder neuen Domain** die Köpfe mit `curl -sI` prüfen, nicht nur
+  auf `pages.dev`:
+
+  ```sh
+  curl -sI https://interaction-diagram.onurkoc.net/app.js
+  curl -sI https://interaction-diagram.onurkoc.net/vendor/xlsx-0.20.3.mjs
+  ```
+
+  Erwartet: `cache-control: no-cache` bzw.
+  `public, max-age=31536000, immutable`, je genau ein Wert.
 
 ## Prüfliste nach dem Deployment
 
