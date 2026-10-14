@@ -636,7 +636,11 @@ test('figure: plain concrete section, one curve with the reduced f_cd (D7)', () 
         const [curve] = /** @type {any[]} */ (fig.data);
         // f_cd = alpha_cc,pl * 30 / 1.5 = 16
         assert.ok(curve.name.startsWith(`${t('draw.concrete_plain')}<br>` +
-            `${t('draw.f_cd_reduced', { f_cd: t.fmt(16, 2) })}<br>`));
+            `${t('draw.f_cd_reduced', { f_cd: t.fmt(16, 2) })}<br>` +
+            `h = ${t.num(0.3)} m<br>b = 1 m<br>`));
+        // only f_cd, h and b, no d_1 and d_2
+        assert.ok(!curve.name.includes('d_1'));
+        assert.ok(!curve.name.includes('d_2'));
         // the only curve governs: solid
         assert.equal(curve.line.dash, 'solid');
         assert.ok(hints(en1992, result, null, t).includes(t('hint.plain_en')));
