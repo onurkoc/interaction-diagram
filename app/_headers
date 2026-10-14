@@ -1,0 +1,22 @@
+# Cloudflare Pages: cache rules, see DEPLOY.md.
+# The rules must not overlap: if two rules set the same header for a
+# file, Cloudflare joins the two values. ":file" matches one name
+# without "/", so the rules for *.js do not reach into vendor/.
+
+# The app itself: the browser asks on every visit whether the file has
+# changed, so a new version appears on a normal reload.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/:file.js
+  Cache-Control: no-cache
+/:file.css
+  Cache-Control: no-cache
+/norms/:file.js
+  Cache-Control: no-cache
+
+# Libraries: kept for one year. A new version of a library needs a new
+# file name, otherwise browsers keep the old file.
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable

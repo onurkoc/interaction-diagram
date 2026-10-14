@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 580" font-family="Arial, Helvetica, sans-serif" font-size="15">
+  <!-- CULT-I: the distances of a load point and of the centre of the curve.
+       Own sketch for this repository, axes as in the app:
+       N vertical with compression at the top, M horizontal. -->
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#222"/>
+    </marker>
+    <marker id="red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#b00020"/>
+    </marker>
+    <marker id="blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 Z" fill="#1f4e79"/>
+    </marker>
+  </defs>
+  <rect width="560" height="580" fill="#fff"/>
+
+  <!-- axes: M to the right, N upwards = compression -->
+  <line x1="40" y1="470" x2="520" y2="470" stroke="#222" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <line x1="260" y1="560" x2="260" y2="24" stroke="#222" stroke-width="1.2" marker-end="url(#arrow)"/>
+  <text x="528" y="475" fill="#222">M</text>
+  <text x="272" y="30" fill="#222">N (compression)</text>
+  <text x="272" y="556" fill="#222">(tension)</text>
+
+  <!-- capacity curve, both sides -->
+  <path d="M260 60 C330 110 440 210 440 300 C440 380 330 450 260 500 C190 450 80 380 80 300 C80 210 190 110 260 60 Z"
+        fill="none" stroke="#1f4e79" stroke-width="3"/>
+
+  <!-- centre of the curve: M = 0, normal force of the largest moment -->
+  <line x1="60" y1="300" x2="500" y2="300" stroke="#1f4e79" stroke-width="1" stroke-dasharray="5 5"/>
+  <circle cx="260" cy="300" r="5" fill="#1f4e79"/>
+  <text x="150" y="322" fill="#1f4e79">centre</text>
+
+  <!-- M_rel,max and N_rel,max -->
+  <line x1="264" y1="300" x2="436" y2="300" stroke="#1f4e79" stroke-width="1.6" marker-start="url(#blue)" marker-end="url(#blue)"/>
+  <text x="318" y="322" fill="#1f4e79">M_rel,max</text>
+  <line x1="440" y1="60" x2="512" y2="60" stroke="#1f4e79" stroke-width="1" stroke-dasharray="5 5"/>
+  <line x1="490" y1="296" x2="490" y2="64" stroke="#1f4e79" stroke-width="1.6" marker-start="url(#blue)" marker-end="url(#blue)"/>
+  <text x="470" y="170" fill="#1f4e79" transform="rotate(-90 470 170)">N_rel,max</text>
+
+  <!-- load point i with its distances to the curve -->
+  <circle cx="330" cy="200" r="5" fill="#b00020"/>
+  <text x="270" y="222" fill="#b00020">i (M, N)</text>
+  <line x1="335" y1="200" x2="398" y2="200" stroke="#b00020" stroke-width="1.6" marker-start="url(#red)" marker-end="url(#red)"/>
+  <text x="338" y="222" fill="#b00020">M_rel,i</text>
+  <line x1="330" y1="195" x2="330" y2="121" stroke="#b00020" stroke-width="1.6" marker-start="url(#red)" marker-end="url(#red)"/>
+  <text x="340" y="150" fill="#b00020">N_rel,i</text>
+</svg>
