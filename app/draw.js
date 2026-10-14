@@ -1,0 +1,408 @@
+// @ts-check
+/*
+Figure of the interaction diagram for Plotly
+Port of legacy/draw_diagram.py.
+
+figure() only builds the data and the layout, so it can be tested
+without a browser. draw() hands them to Plotly. All texts come from the
+table of the chosen language (i18n.js).
+*/
+
+/** @typedef {import('./core.js').InputValues} InputValues */
+/** @typedef {import('./core.js').Values} Values */
+/** @typedef {import('./norms/en1992.js').Norm} Norm */
+/** @typedef {import('./cult_i.js').CultIDetails} CultIDetails */
+/** @typedef {import('./i18n.js').Translator} Translator */
+
+/**
+ * The part of the Plotly library (vendor/plotly-basic-4.1.2.min.js) that is
+ * used here. The library is passed as an argument, so this file can be
+ * type checked without the library.
+ * @typedef {Object} PlotlyLibrary
+ * @property {(element: HTMLElement, data: Object[], layout: Object,
+ *     config?: Object) => Promise<any>} react
+ * @property {(element: HTMLElement) => void} purge
+ */
+
+/**
+ * One load point of the diagram, design values.
+ * @typedef {Object} LoadPoint
+ * @property {number} m  moment [MNm] (the diagram shows kNm and kN)
+ * @property {number} n  normal force [MN], compression negative
+ * @property {number} m_mod  moment used for the check [MNm]: m, or the
+ *     moment with the minimum eccentricity (EN 1992-1-1 6.1 (4))
+ * @property {boolean} modified  true: m_mod is not m
+ * @property {boolean} inside  the point of the check (m_mod, n) is inside
+ *     of the curve with reinforcement
+ * @property {CultIDetails | 'outside' | null} cult  null: not calculated
+ * @property {number | null} utilization  radial utilization |S_d| / |R_d|,
+ *     null: not calculated or not defined for this curve
+ */
+
+/**
+ * @typedef {Object} Figure
+ * @property {Object[]} data  traces
+ * @property {Object} layout
+ * @property {string[]} legend_lines  the legend as text, for small screens
+ */
+
+const GOVERNING_LINE = { color: '#1f4e79', dash: 'solid', width: 3.5 };
+const COMPARISON_LINE = { color: '#888888', dash: 'dash', width: 1.5 };
+
+const HOVERLABEL = {
+    bordercolor: 'gray',
+    bgcolor: 'lightgray',
+    font: { size: 12, family: 'consolas, monospace' },
+};
+
+/**
+ * The diagram shows kN and kNm, like the table; the calculation uses
+ * MN and MNm (as legacy/core.py).
+ * @param {number[]} values  [MN] or [MNm]
+ * @returns {number[]} [kN] or [kNm]
+ */
+function kilo(values) {
+    return values.map(value => value * 1000);
+}
+
+/**
+ * @param {number[]} moments  [kNm]
+ * @param {number[]} forces  [kN]
+ * @param {Translator} t
+ * @returns {string[]}
+ */
+function hover_curve(moments, forces, t) {
+    return moments.map((m, i) =>
+        `M: ${t.fmt(m, 2)} kNm<br>N: ${t.fmt(forces[i], 1)} kN`);
+}
+
+/**
+ * Text of CULT-I for the hover label and the table.
+ * @param {CultIDetails | 'outside' | null} cult
+ * @param {Translator} t
+ * @returns {string}
+ */
+export function cult_text(cult, t) {
+    if (cult === null) {
+        return '';
+    }
+    if (cult === 'outside') {
+        return t('cult.outside');
+    }
+    return t.fmt(cult.cult_I, 3);
+}
+
+/**
+ * Smallest CULT-I of the load points, 'outside' if one of them is
+ * outside of the curve, null if there is nothing to show.
+ * @param {LoadPoint[]} points
+ * @returns {number | 'outside' | null}
+ */
+export function min_cult_I(points) {
+    /** @type {number | null} */
+    let smallest = null;
+    for (const point of points) {
+        if (point.cult === null) {
+            continue;
+        }
+        if (point.cult === 'outside') {
+            return 'outside';
+        }
+        if (smallest === null || point.cult.cult_I < smallest) {
+            smallest = point.cult.cult_I;
+        }
+    }
+    return smallest;
+}
+
+/**
+ * Largest radial utilization of the load points, null if there is none.
+ * @param {LoadPoint[]} points
+ * @returns {number | null}
+ */
+export function max_utilization(points) {
+    /** @type {number | null} */
+    let largest = null;
+    for (const point of points) {
+        if (point.utilization !== null &&
+            (largest === null || point.utilization > largest)) {
+            largest = point.utilization;
+        }
+    }
+    return largest;
+}
+
+/**
+ * Data and layout of the diagram.
+ * @param {InputValues} i_val  input values from int_diagram
+ * @param {Values} val  capacity curves from int_diagram
+ * @param {Norm} norm
+ * @param {LoadPoint[]} points  load points, may be empty
+ * @param {Translator} t  texts of the chosen language
+ * @param {Object} [options]
+ * @param {number | null} [options.e0]  minimum eccentricity [m], null: none
+ * @param {boolean} [options.narrow]  small screen: legend below the diagram
+ * @param {boolean} [options.example]  the input is the example, not a project
+ * @returns {Figure}
+ */
+export function figure(i_val, val, norm, points, t,
+                       { e0 = null, narrow = false, example = false } = {}) {
+    /** @type {Object[]} */
+    const data = [];
+    // the legend as text, one line for each trace (for small screens)
+    /** @type {string[]} */
+    const legend_lines = [];
+    /**
+     * @param {string} colour  key of the text that says how the trace looks
+     * @param {Object} trace
+     */
+    const add = (colour, trace) => {
+        data.push(trace);
+        const name = /** @type {any} */ (trace).name.split('<br>').filter(
+            (/** @type {string} */ part) => part !== '').join(', ');
+        legend_lines.push(`${t(colour)}: ${name}`);
+    };
+
+    // closed curve: right side, then the left side backwards
+    const concrete_x = kilo(val['Moment'].concat(
+        val['Moment Neg'].slice().reverse()));
+    const concrete_y = kilo(val['Normal Force'].concat(
+        val['Normal Force Neg'].slice().reverse()));
+    // the concrete curve depends on f_cd, h and b only
+    const section = `h = ${t.num(i_val['h'])} m<br>b = ${t.num(i_val['b'])} m<br>`;
+    const f_cd = { f_cd: t.fmt(i_val['f_cd'], 2) };
+    let name_concrete;
+    if (i_val['plain']) {
+        // plain concrete section: the strength is reduced (D7)
+        name_concrete = `${t('draw.concrete_plain')}<br>` +
+            `${t('draw.f_cd_reduced', f_cd)}<br>` + section;
+    } else {
+        name_concrete = `${t('draw.concrete_comparison')}<br>` +
+            `${t('draw.f_cd', f_cd)}<br>` + section;
+    }
+    // The governing curve is drawn solid and strong: the curve with
+    // reinforcement, or the concrete curve of a plain section. With
+    // reinforcement the concrete curve is only a comparison line.
+    add(i_val['plain'] ? 'colour.governing' : 'colour.comparison', {
+        type: 'scatter',
+        x: concrete_x,
+        y: concrete_y,
+        mode: 'lines',
+        name: name_concrete,
+        line: i_val['plain'] ? GOVERNING_LINE : COMPARISON_LINE,
+        text: hover_curve(concrete_x, concrete_y, t),
+        hoverinfo: 'text',
+        hoverlabel: HOVERLABEL,
+    });
+
+    if (!i_val['plain']) {
+        const reinf_x = kilo(val['Moment Reinf'].concat(
+            val['Moment Reinf Neg'].slice().reverse()));
+        const reinf_y = kilo(val['Normal Force Reinf'].concat(
+            val['Normal Force Reinf Neg'].slice().reverse()));
+        add('colour.governing', {
+            type: 'scatter',
+            x: reinf_x,
+            y: reinf_y,
+            mode: 'lines',
+            name: `${t('draw.reinforced')}<br>` +
+                `a_s1 = ${t.fmt(i_val['a_s1'], 2)} cm²<br>` +
+                `a_s2 = ${t.fmt(i_val['a_s2'], 2)} cm²<br>` +
+                `f_yd = ${t.fmt(i_val['f_yd'], 2)} N/mm²<br>`,
+            line: GOVERNING_LINE,
+            text: hover_curve(reinf_x, reinf_y, t),
+            hoverinfo: 'text',
+            hoverlabel: HOVERLABEL,
+        });
+    }
+
+    if (e0 !== null) {
+        // minimum eccentricity (EN 1992-1-1 6.1 (4), D1): rays M = +-e0 * N
+        // for compression, from the largest compression force to N = 0 and back
+        const n_min = Math.min(...val['Normal Force Reinf']);
+        add('colour.ray', {
+            type: 'scatter',
+            x: kilo([-e0 * n_min, 0, e0 * n_min]),
+            y: kilo([n_min, 0, n_min]),
+            mode: 'lines',
+            name: `${t('draw.min_eccentricity')}<br>e0 = ${t.fmt(e0, 3)} m<br>`,
+            line: { color: '#c06000', dash: 'dashdot', width: 1.5 },
+            hoverinfo: 'skip',
+        });
+    }
+
+    if (points.length > 0) {
+        // Two traces: points inside and points outside of the curve, so
+        // that the legend says how many there are of each.
+        /**
+         * @param {LoadPoint} p
+         * @param {number} i  index of the point in the table
+         * @returns {string}
+         */
+        const hover_point = (p, i) => {
+            let text = `${t('draw.point', { number: i + 1 })}<br>` +
+                `M: ${t.fmt(p.m * 1000, 2)} kNm<br>` +
+                `N: ${t.fmt(p.n * 1000, 1)} kN`;
+            if (p.modified) {
+                text += '<br>' + t('draw.m_mod',
+                                   { value: t.fmt(p.m_mod * 1000, 2) });
+            }
+            if (p.utilization !== null) {
+                text += '<br>' + t('draw.utilization',
+                                   { value: t.fmt(p.utilization, 3) });
+            }
+            if (!p.inside) {
+                text += '<br>' + t('draw.outside');
+            } else if (p.cult !== null) {
+                text += '<br>' + t('draw.cult', { value: cult_text(p.cult, t) });
+            }
+            return text;
+        };
+        const numbered = points.map((p, i) => ({ p: p, i: i }));
+        const inside = numbered.filter(entry => entry.p.inside);
+        const outside = numbered.filter(entry => !entry.p.inside);
+        const total = points.length;
+        // the points are the values of the file times gamma_d (loads.js)
+        const design_values = i_val['gamma_d'] === 1
+            ? t('draw.design_values_read')
+            : t('draw.design_values', { gamma_d: i_val['gamma_d'] });
+
+        if (inside.length > 0) {
+            let name_inside = t('draw.points_inside',
+                                { count: inside.length, total: total }) +
+                `<br>${design_values}`;
+            const largest = max_utilization(inside.map(entry => entry.p));
+            if (largest !== null) {
+                name_inside += '<br>' + t('draw.max_utilization',
+                                          { value: t.fmt(largest, 3) });
+            }
+            const smallest = min_cult_I(inside.map(entry => entry.p));
+            if (typeof smallest === 'number') {
+                name_inside += '<br>' + t('draw.min_cult',
+                                          { value: t.fmt(smallest, 3) });
+            }
+            add('colour.inside', {
+                type: 'scatter',
+                x: kilo(inside.map(entry => entry.p.m)),
+                y: kilo(inside.map(entry => entry.p.n)),
+                mode: 'markers',
+                name: name_inside,
+                marker: {
+                    color: '#2e8b57',
+                    size: 8,
+                    symbol: 'diamond',
+                    line: { color: 'black', width: 1 },
+                },
+                text: inside.map(entry => hover_point(entry.p, entry.i)),
+                hoverinfo: 'text',
+                hoverlabel: HOVERLABEL,
+            });
+        }
+        if (outside.length > 0) {
+            let name_outside = t('draw.points_outside',
+                                 { count: outside.length, total: total }) +
+                `<br>${design_values}`;
+            const largest = max_utilization(outside.map(entry => entry.p));
+            if (largest !== null) {
+                name_outside += '<br>' + t('draw.max_utilization',
+                                           { value: t.fmt(largest, 3) });
+            }
+            add('colour.outside', {
+                type: 'scatter',
+                x: kilo(outside.map(entry => entry.p.m)),
+                y: kilo(outside.map(entry => entry.p.n)),
+                mode: 'markers',
+                name: name_outside,
+                marker: {
+                    color: 'red',
+                    size: 8,
+                    symbol: 'diamond',
+                    line: { color: 'black', width: 1 },
+                },
+                text: outside.map(entry => hover_point(entry.p, entry.i)),
+                hoverinfo: 'text',
+                hoverlabel: HOVERLABEL,
+            });
+        }
+
+        // points moved by the minimum eccentricity
+        const moved = points.filter(p => p.modified);
+        if (moved.length > 0) {
+            add('colour.moved', {
+                type: 'scatter',
+                x: kilo(moved.map(p => p.m_mod)),
+                y: kilo(moved.map(p => p.n)),
+                mode: 'markers',
+                name: t('draw.points_moved'),
+                marker: {
+                    color: 'rgba(0, 0, 0, 0)',
+                    size: 8,
+                    symbol: 'diamond',
+                    line: { color: '#555', width: 1.5 },
+                },
+                text: moved.map(p =>
+                    t('draw.m_mod', { value: t.fmt(p.m_mod * 1000, 2) }) +
+                    `<br>N: ${t.fmt(p.n * 1000, 1)} kN`),
+                hoverinfo: 'text',
+                hoverlabel: HOVERLABEL,
+            });
+        }
+    }
+
+    /** @type {any} */
+    const layout = {
+        title: { text: t(norm.label), font: { size: 16 } },
+        plot_bgcolor: '#f9f7f7',
+        margin: { l: 60, r: 20, b: 50, t: 50, pad: 4 },
+        hovermode: 'closest',
+        autosize: true,
+        // decimal sign of the language, a blank for thousands
+        separators: t.decimal + ' ',
+        xaxis: {
+            tickformat: '.0f',
+            title: { text: t('axis.m'), font: { size: 16 } },
+            zeroline: true,
+        },
+        yaxis: {
+            // compression (negative) at the top, as in legacy/draw_diagram.py
+            autorange: 'reversed',
+            // room for the numbers and the title, whatever their length
+            automargin: true,
+            tickformat: '.0f',
+            title: { text: t('axis.n'), font: { size: 16 } },
+            zeroline: true,
+        },
+        legend: {
+            traceorder: 'normal',
+            font: { family: 'arial, sans-serif', size: 12, color: '#000' },
+            bgcolor: '#E2E2E2',
+            bordercolor: '#FFFFFF',
+            borderwidth: 1.5,
+        },
+    };
+    if (example) {
+        // example values are named in the legend
+        layout.legend.title = { text: t('example.note'), font: { size: 12 } };
+        legend_lines.unshift(t('example.note'));
+    }
+    if (narrow) {
+        // small screen: short title, no legend inside the diagram
+        // (the page shows legend_lines below it)
+        layout.title.text = norm.name;
+        layout.showlegend = false;
+    }
+
+    return { data: data, layout: layout, legend_lines: legend_lines };
+}
+
+/**
+ * Draw the figure into an element of the page.
+ * @param {PlotlyLibrary} Plotly  the Plotly library
+ * @param {HTMLElement} element
+ * @param {Figure} fig
+ * @returns {Promise<any>}
+ */
+export function draw(Plotly, element, fig) {
+    return Plotly.react(element, fig.data, fig.layout,
+                        { responsive: true, displaylogo: false });
+}
