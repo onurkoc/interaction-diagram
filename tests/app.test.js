@@ -10,6 +10,7 @@ test runs for every language.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { NORMS, parse_number, check_inputs, calculate, table, hints,
          summary_text, sort_order, rewrite_number, shown_messages, EXAMPLE,
          NO_EXAMPLE, example_loaded, example_edited, example_undone,
@@ -164,6 +165,18 @@ test('check_inputs: no presets, an empty field is a missing value', () => {
     assert.deepEqual(keys_of(eta_t), ['check.eta_t_missing']);
     assert.equal(eta_t[0].field, 'eta_t');
     assert.deepEqual(check_inputs(raw({ eta_t: '' }), en1992).messages, []);
+});
+
+test('page: the minimum eccentricity is switched on by default (EN 6.1 (4))', () => {
+    const html = readFileSync(new URL('../app/index.html', import.meta.url),
+                              'utf8');
+    const box = html.match(/<input[^>]*id="eccentricity"[^>]*>/);
+    assert.ok(box !== null);
+    assert.match(box[0], /\bchecked\b/);
+    // the box is part of the EN inputs only
+    const en_block = html.slice(html.indexOf('<div data-norm="en1992">'));
+    assert.ok(en_block.indexOf('id="eccentricity"') <
+              en_block.indexOf('<div data-norm="sia262">'));
 });
 
 test('check_inputs: the minimum eccentricity exists in the EN mode only', () => {
