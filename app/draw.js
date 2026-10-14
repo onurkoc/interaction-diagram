@@ -15,7 +15,7 @@ table of the chosen language (i18n.js).
 /** @typedef {import('./i18n.js').Translator} Translator */
 
 /**
- * The part of the Plotly library (vendor/plotly-basic.min.js) that is
+ * The part of the Plotly library (vendor/plotly-basic-4.1.2.min.js) that is
  * used here. The library is passed as an argument, so this file can be
  * type checked without the library.
  * @typedef {Object} PlotlyLibrary

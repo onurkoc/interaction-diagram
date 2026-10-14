@@ -1,7 +1,7 @@
 // @ts-check
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as XLSX from '../app/vendor/xlsx.mjs';
+import * as XLSX from '../app/vendor/xlsx-0.20.3.mjs';
 import { column_head, read_rows, read } from '../app/xls_read.js';
 import { design_values, section_forces, load_points } from '../app/loads.js';
 import { throwsKey } from './helpers.js';

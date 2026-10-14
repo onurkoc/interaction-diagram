@@ -131,7 +131,7 @@ Zuerst auf der Vorschau, später noch einmal auf der eigenen Domain.
    `curl -I`:
    - `…/app.js`, `…/style.css`, `…/norms/sia262.js` und die Seite
      selbst: `Cache-Control: no-cache`, genau ein Wert.
-   - `…/vendor/plotly-basic.min.js`, `…/vendor/xlsx.mjs`:
+   - `…/vendor/plotly-basic-4.1.2.min.js`, `…/vendor/xlsx-0.20.3.mjs`:
      `Cache-Control: public, max-age=31536000, immutable`, genau ein
      Wert.
    - `.js` und `.mjs` kommen mit einem JavaScript-Typ
