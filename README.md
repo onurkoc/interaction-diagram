@@ -299,6 +299,71 @@ Opening `index.html` directly from the disk (`file://`) does not work,
 because browsers do not load JavaScript modules that way. The page then
 shows a message instead of the app.
 
+## Agent tool (MCP)
+
+`agent/` contains a local MCP server (transport stdio). With it an AI
+agent can calculate the interaction diagram and the radial utilization
+without using the web page. **It is a pre-check, not a verification
+with a recognised program**; every answer says so.
+
+- The calculation is the one of the app: the server calls the modules
+  in `app/` and has no calculation of its own. `agent/` is not part of
+  the web app and is not deployed.
+- Same limits as the app (see [Scope and limits](#scope-and-limits)).
+  Invalid input is rejected with the messages of the app, nothing is
+  corrected (e.g. f_ck > 50, d_1 ≥ h, a missing η_t in the SIA mode).
+- Units and sign convention have no default and have to be given in
+  every call: `force_unit` (`kN` | `MN`), `moment_unit` (`kNm` | `MNm`)
+  and `compression` (`negative` | `positive`, the sign of a compressive
+  normal force). The answer uses the same units and signs. M > 0 always
+  means tension on the side of a_s1.
+- The section is given in m (h, b, d_1, d_2), cm² (a_s1, a_s2) and
+  N/mm² (f_ck, f_yk). γ_c, γ_s, α_cc and α_cc,pl take the preset of the
+  app if they are not given; the answer lists them.
+- Every answer contains the input as understood, the code, the version
+  of the app (git commit), the validation status and the note
+  «Vorprüfung – kein Nachweis mit einem anerkannten Programm».
+
+Tools:
+
+- `interaction_diagram`: the capacity curve with reinforcement (both
+  sides, points N–M), f_cd and f_yd.
+- `check_loads`: the same input plus `loads` (list of `{N, M}`) and the
+  load factor `gamma_d` (required, 1.0 for design values). For every
+  point: inside / outside and the radial utilization as in the app;
+  the governing point is the one with the largest utilization. Option
+  `min_eccentricity` (EN only, on by default as in the app).
+
+Install (Node.js 24) and add it to Claude Code:
+
+```sh
+cd agent
+npm install
+claude mcp add interaction-diagram -- node /path/to/repo/agent/server.js
+```
+
+Example call of `check_loads`:
+
+```json
+{
+  "norm": "sia262",
+  "h": 0.30, "b": 1.0, "d_1": 0.05, "d_2": 0.05,
+  "a_s1": 5.24, "a_s2": 5.24, "f_ck": 30, "f_yk": 500, "eta_t": 0.85,
+  "force_unit": "kN", "moment_unit": "kNm", "compression": "negative",
+  "gamma_d": 1.0,
+  "loads": [{ "N": -1000, "M": 100 }, { "N": -1500, "M": -80 }]
+}
+```
+
+Tests and type check of the server (`npm test` runs the tests of the
+tools and the test of the MCP server, which needs the packages):
+
+```sh
+cd agent
+npm test
+npx -p typescript tsc --noEmit -p jsconfig.json
+```
+
 ## For developers
 
 All texts of the interface are in `app/i18n.js`, one table for each
@@ -329,6 +394,7 @@ app/                the static app
   vendor/           Plotly.js, SheetJS (with their licences)
   _headers          cache rules for Cloudflare Pages
 start.cmd, serve.py starts the app locally (Python 3)
+agent/              MCP server for agents (not deployed), see above
 legacy/             the original Python code of 2020 (Dash), reference only
 tests/              tests, run with node
 NOTES.md            assumptions, findings and decisions (German)
@@ -341,6 +407,11 @@ Tests and type check (tested with Node.js 24):
 node --test
 npx -p typescript tsc --noEmit -p jsconfig.json
 ```
+
+`node --test` in the root folder also runs the tests of `agent/tools.js`;
+they do not need the packages of `agent/`. The test of the MCP server
+itself runs only with `npm test` in `agent/`. The type check of the root
+folder covers `app/` only, `agent/` has its own (see above).
 
 `tests/reference/reference.json` holds values calculated with the
 unchanged `legacy/core.py`. To create it again (Python 3 with numpy < 2
