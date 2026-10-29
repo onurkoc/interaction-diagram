@@ -7,10 +7,10 @@ uploaded.
 
 **Open the app: <https://interaction-diagram.onurkoc.net/>**
 
-Validation status: the curve with reinforcement was compared with commercial program
-for SIA 262 and symmetric reinforcement only. Everything else is only
-covered by automated tests, not compared with an independent program
-(details below).
+Validation status: the curve with reinforcement was compared with a
+commercial program for SIA 262 (symmetric reinforcement only) and with
+the open-source library structuralcodes for EN 1992-1-1. Everything else
+is only covered by automated tests (details below).
 
 ![The app with invented load points](images/app.png)
 
@@ -53,12 +53,25 @@ The most important ones:
   a conservative assumption.
 - Plain concrete (a_s1 = a_s2 = 0): reduced design strength, see NOTES.md.
 
-**Validation status.** The curve with reinforcement was compared with
-commercial program for one section, for SIA 262 and symmetric reinforcement only (see
-NOTES.md section 6). EN 1992-1-1, asymmetric reinforcement, plain
-concrete, the radial utilization and CULT-I are only covered by
-automated tests, not compared with an independent program. The app shows
-this note on its first page and below the calculator.
+**Validation status.**
+
+- SIA 262: the curve with reinforcement was compared with a commercial
+  program for one section with symmetric reinforcement (see NOTES.md
+  section 6).
+- EN 1992-1-1: the curve with reinforcement was compared with the
+  open-source library structuralcodes (fib) in 720 points (40 sections,
+  also asymmetric and with reinforcement on one side only). At no point
+  is the app more than 0.1 % of M_max above structuralcodes. The
+  deviations are on the safe side only: up to 1.3 % of M_max at high
+  compression (the app uses pivot point C, structuralcodes does not)
+  and up to 2.7 % of M_max with A_s = 0 on the tension side. The
+  comparison can be repeated: `tests/reference/structuralcodes_compare.py`
+  (structuralcodes 0.7.3) writes the values, `tests/structuralcodes.test.js`
+  checks the app against them.
+- SIA 262 with asymmetric reinforcement, plain concrete, the radial
+  utilization and CULT-I are only covered by automated tests.
+
+The app shows this note on its first page and below the calculator.
 
 ## How to use it
 
@@ -335,6 +348,15 @@ and pandas):
 
 ```sh
 python -B tests/reference/make_reference.py
+```
+
+`tests/reference/structuralcodes.json` holds the comparison values of
+structuralcodes for EN 1992-1-1. To create it again (Python 3 with
+structuralcodes 0.7.3 as the only package):
+
+```sh
+pip install structuralcodes==0.7.3
+python -B tests/reference/structuralcodes_compare.py
 ```
 
 The code in `legacy/` is not maintained and the Dash app there does not

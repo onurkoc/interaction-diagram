@@ -95,7 +95,7 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 | D3 | Stahldehnungsgrenze 12 ‰ bleibt, horizontaler Ast. Ergänzt 2026-10-14: Beide Normen verlangen für den horizontalen Ast keine Dehnungsgrenze (EN 1992-1-1 3.2.7 (2) b; SIA 262:2025 4.2.2.5 / 4.2.2.6, eine Grenze ε_ud nach Tabelle 9 nur bei linearer Verfestigung). Die 12 ‰ sind eine Annahme aus `legacy/core.py`, kein Normwert; die Oberfläche nennt sie «Annahme dieser App». Offen: SIA 262 Figur 16 ist im Vault nicht als Bild vorhanden, Prüfung durch Onur. |
 | D4 | f_ck ≤ 50 MPa in beiden Modi; Eingabe darüber mit Meldung ablehnen. |
 | D5 | Drehpunkt C auch im SIA-Modus, als konservative Annahme analog EN. |
-| D6 | Vergleich eines Querschnitts mit commercial program nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
+| D6 | Vergleich eines Querschnitts mit einem kommerziellen Programm nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
 | D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
 | D8 | Mindestausmitte im EN-Modus mit Vorgabe «ein» (Checkbox beim Start eingeschaltet), weil EN 1992-1-1 6.1 (4) sie «in der Regel» verlangt. Abschalten ist eine bewusste Abweichung des Anwenders. Im SIA-Modus keine Mindestausmitte (unverändert, D1). Entscheid Onur 2026-10-14, umgesetzt in `744d9ea`. |
 
@@ -109,7 +109,7 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 | E10 (D7) | umgesetzt im Rechenkern; Hinweis und Legende folgen mit der Oberfläche |
 | N1 | umgesetzt: Druckbewehrung = a_s2 |
 | E2 (D1), damit C1 und N7 | umgesetzt im Rechenkern (`min_eccentricity_moments`, `cult_I_min_eccentricity`); Strahl M = ±e0·N und Tabelle folgen mit der Oberfläche |
-| E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. commercial program-Vergleich (D6) bestanden, siehe Abschnitt 6. |
+| E3 (D2, D5) + N2, damit C4 | umgesetzt: Dehnungsebenen mit Drehpunkten A, B, C bis reiner Zug in beiden Modi; negative Seite mit vertauschten Rollen gerechnet. Vergleich mit dem kommerziellen Programm (D6) bestanden, siehe Abschnitt 6. |
 | C2 | erledigt mit dem Port: In `cult_i.js` ist das Ergebnis an dieser Stelle immer eine Zahl, die Typabfrage entfällt. Keine Änderung der Rechnung. |
 | C3 | umgesetzt: Bei m = 0 ist ein Punkt jenseits von reinem Zug oder zentrischem Druck «outside» |
 | N3 | umgesetzt: CULT-I verwendet auf beiden Seiten die bewehrte Kurve mit ihren eigenen Normalkräften |
@@ -145,17 +145,42 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
 - **Regel-Tests** (`tests/corrections.test.js`): je Korrektur ein Test, der
   nur prüft, was direkt aus der Regel folgt. Keine von der App
   gerechneten Erwartungswerte.
-- **commercial program-Referenz** (`tests/commercial program.test.js`), Vergleich durch Onur Koc am
-  2026-10-12, bestanden:
+- **Referenz kommerzielles Programm** (`tests/commercial.test.js`),
+  Vergleich durch Onur Koc am 2026-10-12, bestanden:
   - Querschnitt: h = 0,30 m, b = 1,0 m, C30/37, B500,
     a_s1 = a_s2 = 5,24 cm², d_1 = d_2 = 0,05 m; SIA 262, η_t = 1,0.
-  - commercial program-Einstellungen: Beton Typ 2 (Parabel-Rechteck), γ_c = 1,5,
+  - Einstellungen im kommerziellen Programm: Beton Typ 2
+    (Parabel-Rechteck), γ_c = 1,5,
     γ_cE = 1,0, keine Abminderung, Kriechzahl 0, f_ct = 0;
     Grenzdehnungen ε_cu,c = −2,0 ‰, ε_cu,t = −3,5 ‰, ε_s1 = 12 ‰;
     Stahl ideal plastisch, γ_s = 1,15.
   - Geprüfte Punkte (N [kN] / M [kNm]): −6419,2 / 0; 455,7 / 0;
-    −2496,8 / 259,9; 0 / 59,1. Ausnutzung in commercial program je 1,00.
-  - Toleranz im Test: 1 % (commercial program gibt zwei Nachkommastellen aus).
+    −2496,8 / 259,9; 0 / 59,1. Ausnutzung im kommerziellen Programm je 1,00.
+  - Toleranz im Test: 1 % (das Programm gibt zwei Nachkommastellen aus).
+- **Vergleich mit structuralcodes** (Open-Source-Bibliothek der fib),
+  nur EN 1992-1-1, Kurve mit Bewehrung (Mitteilung Onur 2026-10-29):
+  720 Punkte, 40 Querschnitte, auch unsymmetrisch und einseitig
+  bewehrt. Die App liegt an keinem Punkt mehr als 0,1 % von M_max über
+  structuralcodes; Abweichungen nur zur sicheren Seite, siehe Befunde
+  V1 und V2 in Abschnitt 7. Reproduzierbar mit
+  `tests/reference/structuralcodes_compare.py` (structuralcodes 0.7.3,
+  fester Startwert 20261029), das `tests/reference/structuralcodes.json`
+  schreibt; `tests/structuralcodes.test.js` prüft an allen 720 Punkten
+  App ≤ structuralcodes + 0,1 % M_max (Seite +) bzw. ≥ (Seite −).
+  Stand mit diesen Werten (2026-10-29, nur gemeldet, nicht als
+  Erwartungswert im Test): zur unsicheren Seite höchstens 0,011 % von
+  M_max; zur sicheren Seite bei Druck über 50 % des Druckendes bis
+  1,36 %, bei A_s = 0 auf der Zugseite bis 1,96 %. Die 2,7 % aus dem
+  Vergleich vom 29.10. stammen aus einer anderen Stichprobe.
 
 Neue Referenzwerte kommen aus einem anerkannten Programm, nicht aus
 dieser App.
+
+## 7 Befunde aus Vergleichen
+
+App-Code unverändert; Entscheid offen (Onur).
+
+| Nr | Bereich | Befund | Bewertung |
+|---|---|---|---|
+| V1 | EN 1992-1-1, hoher Druck | Die App liegt bis 1,3 % von M_max unter structuralcodes. Die App lässt die Dehnungsebenen im Druckbereich um Drehpunkt C drehen (EN 6.1 (5), Bild 6.1; D2), structuralcodes nicht. | Sichere Seite. Folgt aus D2. |
+| V2 | EN 1992-1-1, A_s = 0 auf der Zugseite (einseitig bewehrt) | Die App liegt bis 2,7 % von M_max unter structuralcodes. Ursache nicht untersucht. | Sichere Seite. Ursache offen. |

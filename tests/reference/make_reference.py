@@ -48,7 +48,7 @@ CASES = [
      # cult_i.py uses the wrong distance to the tension side for these
      # points (N9 in NOTES.md), their old results are not kept
      'cult_I_skip': [(0.05, -1.0), (-0.05, -1.0), (0.02, -5.5)]},
-    # typical shotcrete lining, section for the comparison with commercial program
+    # typical shotcrete lining, section compared with a commercial program
     {'name': 'shotcrete_h30_c30_b500',
      'params': {'h_': 0.30, 'b_': 1.0, 'd_1': 0.05, 'd_2': 0.05,
                 'a_s1': 5.24, 'a_s2': 5.24, 'f_ck': 30, 'f_yk': 500}},

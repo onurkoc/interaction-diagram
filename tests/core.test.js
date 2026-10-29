@@ -5,7 +5,7 @@ The norm configuration with the legacy strain planes is used, because
 the default planes (pivot points A, B, C) differ from Python.
 The reference contains only sections for which core.py is correct
 (a_s1 = a_s2, d_1 = d_2); the corrections are tested in
-corrections.test.js and commercial program.test.js.
+corrections.test.js and commercial.test.js.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

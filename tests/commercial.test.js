@@ -1,15 +1,15 @@
 // @ts-check
 /*
-Fixed reference: comparison with commercial program (vendor), done by Onur Koc.
+Fixed reference: comparison with a commercial program, done by Onur Koc.
 
 Section: h = 0.30 m, b = 1.0 m, C30/37, B500, a_s1 = a_s2 = 5.24 cm2,
 d_1 = d_2 = 0.05 m, SIA 262 with eta_t = 1.0, gamma_c = 1.5,
 gamma_s = 1.15.
 
 The four points below were calculated with this app and checked in
-commercial program: the utilization of each point is 1.00, so they lie on the
-resistance curve of commercial program. commercial program prints two decimals, therefore the
-tolerance is 1 %. The settings of commercial program are listed in NOTES.md.
+the commercial program: the utilization of each point is 1.00, so they
+lie on its resistance curve. It prints two decimals, therefore the
+tolerance is 1 %. Its settings are listed in NOTES.md.
 */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +20,7 @@ import { sia262 } from '../app/norms/sia262.js';
 const SECTION = { h_: 0.30, b_: 1.0, d_1: 0.05, d_2: 0.05,
                   a_s1: 5.24, a_s2: 5.24, f_ck: 30, f_yk: 500, eta_t: 1.0 };
 
-// points on the resistance curve of commercial program, N [kN], M [kNm]
+// points on the resistance curve of the commercial program, N [kN], M [kNm]
 const N_COMPRESSION = -6419.2;   // centric compression, M = 0
 const N_TENSION = 455.7;         // pure tension, M = 0
 const N_AT_M_MAX = -2496.8;
@@ -57,7 +57,7 @@ const result = int_diagram(SECTION, sia262);
 assert.notEqual(result, null);
 const values = /** @type {any} */ (result)[1];
 
-test('commercial program: centric compression and pure tension', () => {
+test('Commercial program: centric compression and pure tension', () => {
     for (const side of ['', ' Neg']) {
         const n = values['Normal Force Reinf' + side];
         const m = values['Moment Reinf' + side];
@@ -70,7 +70,7 @@ test('commercial program: centric compression and pure tension', () => {
     }
 });
 
-test('commercial program: largest moment with its normal force', () => {
+test('Commercial program: largest moment with its normal force', () => {
     const m_right = values['Moment Reinf'];
     const m_left = values['Moment Reinf Neg'];
     assertWithin1Percent(Math.max(...m_right) * 1000, M_MAX, 'M_max');
@@ -83,7 +83,7 @@ test('commercial program: largest moment with its normal force', () => {
         -M_MAX, '-M at N of M_max');
 });
 
-test('commercial program: moment at N = 0', () => {
+test('Commercial program: moment at N = 0', () => {
     assertWithin1Percent(
         moment_at(0, values['Moment Reinf'], values['Normal Force Reinf']),
         M_AT_N_ZERO, 'M at N = 0');
