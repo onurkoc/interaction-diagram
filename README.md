@@ -61,11 +61,11 @@ The most important ones:
 - EN 1992-1-1: the curve with reinforcement was compared with the
   open-source library structuralcodes (fib) in 720 points (40 sections,
   also asymmetric and with reinforcement on one side only). At no point
-  is the app more than 0.1 % of M_max above structuralcodes. The
-  deviations are on the safe side only: up to 1.3 % of M_max at high
-  compression (the app uses pivot point C, structuralcodes does not)
-  and up to 2.7 % of M_max with A_s = 0 on the tension side. The
-  comparison can be repeated: `tests/reference/structuralcodes_compare.py`
+  is the app more than 0.1 % of M_max above structuralcodes (largest
+  value 0.011 %). The deviations are on the safe side: up to 1.36 % of
+  M_max at high compression (the app uses pivot point C, structuralcodes
+  does not) and up to 1.96 % of M_max with A_s = 0 on the tension side.
+  The comparison can be repeated: `tests/reference/structuralcodes_compare.py`
   (structuralcodes 0.7.3) writes the values, `tests/structuralcodes.test.js`
   checks the app against them.
 - SIA 262 with asymmetric reinforcement, plain concrete, the radial

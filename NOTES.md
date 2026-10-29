@@ -167,11 +167,12 @@ Reihenfolge der Korrekturen, je ein eigener Commit:
   fester Startwert 20261029), das `tests/reference/structuralcodes.json`
   schreibt; `tests/structuralcodes.test.js` prüft an allen 720 Punkten
   App ≤ structuralcodes + 0,1 % M_max (Seite +) bzw. ≥ (Seite −).
-  Stand mit diesen Werten (2026-10-29, nur gemeldet, nicht als
-  Erwartungswert im Test): zur unsicheren Seite höchstens 0,011 % von
-  M_max; zur sicheren Seite bei Druck über 50 % des Druckendes bis
-  1,36 %, bei A_s = 0 auf der Zugseite bis 1,96 %. Die 2,7 % aus dem
-  Vergleich vom 29.10. stammen aus einer anderen Stichprobe.
+  Eine N-Stufe, welche die Kurve der App nicht erreicht, gilt als «App
+  sicherer» (die App nimmt diese Normalkraft nicht auf); sie wird weder
+  extrapoliert noch übersprungen. Ergebnis dieses Laufs (2026-10-29,
+  nur gemeldet, nicht als Erwartungswert im Test): zur unsicheren Seite
+  höchstens 0,011 % von M_max; zur sicheren Seite bei Druck über 50 %
+  des Druckendes bis 1,36 %, bei A_s = 0 auf der Zugseite bis 1,96 %.
 
 Neue Referenzwerte kommen aus einem anerkannten Programm, nicht aus
 dieser App.
@@ -182,5 +183,5 @@ App-Code unverändert; Entscheid offen (Onur).
 
 | Nr | Bereich | Befund | Bewertung |
 |---|---|---|---|
-| V1 | EN 1992-1-1, hoher Druck | Die App liegt bis 1,3 % von M_max unter structuralcodes. Die App lässt die Dehnungsebenen im Druckbereich um Drehpunkt C drehen (EN 6.1 (5), Bild 6.1; D2), structuralcodes nicht. | Sichere Seite. Folgt aus D2. |
-| V2 | EN 1992-1-1, A_s = 0 auf der Zugseite (einseitig bewehrt) | Die App liegt bis 2,7 % von M_max unter structuralcodes. Ursache nicht untersucht. | Sichere Seite. Ursache offen. |
+| V1 | EN 1992-1-1, hoher Druck | Die App liegt bis 1,36 % von M_max unter structuralcodes (Druck über 50 % des Druckendes). Die App lässt die Dehnungsebenen im Druckbereich um Drehpunkt C drehen (EN 6.1 (5), Bild 6.1; D2), structuralcodes nicht. | Sichere Seite. Folgt aus D2. |
+| V2 | EN 1992-1-1, A_s = 0 auf der Zugseite (einseitig bewehrt) | Die App liegt bis 1,96 % von M_max unter structuralcodes. Ursache nicht untersucht. | Sichere Seite. Ursache offen. |
