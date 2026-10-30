@@ -2,7 +2,7 @@
 
 Fachliche Annahmen, Vereinfachungen und offene Punkte der App.
 Normbezüge nur als Ziffern (EN 1992-1-1:2004 + AC:2010 + A1:2014,
-SIA 262:2025, SIA 197:2023). D1–D8 sind Entscheide von Onur Koc.
+SIA 262:2025, SIA 197:2023). D1–D9 sind Entscheide von Onur Koc.
 
 ## 1 Anwendungsbereich
 
@@ -98,6 +98,7 @@ und Verformungen. Für die Querschnittsbemessung gilt 3.1.7
 | D6 | Vergleich eines Querschnitts mit einem kommerziellen Programm nach der Umsetzung. Bestanden, siehe Abschnitt 6. |
 | D7 | Abminderung für unbewehrten Beton nur bei a_s1 = a_s2 = 0 (siehe Abschnitt 2). |
 | D8 | Mindestausmitte im EN-Modus mit Vorgabe «ein» (Checkbox beim Start eingeschaltet), weil EN 1992-1-1 6.1 (4) sie «in der Regel» verlangt. Abschalten ist eine bewusste Abweichung des Anwenders. Im SIA-Modus keine Mindestausmitte (unverändert, D1). Entscheid Onur 2026-10-14, umgesetzt in `744d9ea`. |
+| D9 | Agent-Werkzeug (`agent/`, MCP), Regeln R1–R5 für Agenten, Entscheide Onur 2026-10-30: Jede Eingabe des Querschnitts und jeder Lastpunkt braucht eine Quelle (Dokument, Fundstelle, Art `text` / `table` / `plan` / `figure_reading` / `assumed`; Lastpunkte zusätzlich die Lastkombination); ohne Quelle Ablehnung. Ein angenommener Wert (`assumed`) wird gerechnet, das Urteil lautet «nicht beurteilbar – Angabe fehlt». Aus Grafiken abgelesene Werte, fehlende Rollen max_N / min_N / max_M / min_M je Lastkombination und Punkte ausserhalb der Kurve ergeben «braucht Attention». Das Urteil setzt das Werkzeug, «in Ordnung» gibt es nicht. Umrechnungen im Werkzeug, damit der Agent nicht rechnet: d = c_nom + Querstab-Ø + Ø/2 und a_s = b · Summe der Flächen pro Meter. M_Rd bei N_Ed wird aus der Kurve gelesen wie im Vergleich mit structuralcodes (`intersection`, Abschnitt 6). Vergleich mit Werten der Unterlagen als Abweichung in % des Werkzeugs, **ohne Schwelle** (Bewertung durch den Prüfer). Neues Werkzeug `check_loads_file`: alle Zeilen einer .xlsx-Tabelle mit dem Import der App, Rollen setzt das Werkzeug. Gedeckt durch Regel-Tests (`agent/tests/`), keine neuen Referenzwerte. |
 
 Reihenfolge der Korrekturen, je ein eigener Commit:
 
