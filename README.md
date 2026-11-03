@@ -98,6 +98,9 @@ The app shows this note on its first page and below the calculator.
 
 3. Optional: drop an Excel file with the load points on the dashed area, or
    choose it with the button.
+   Or use **Paste values** (below the dashed area): paste a table with the head
+   row `N` and `M` (or the Plaxis heads), copied from Excel (tab) or separated by
+   `;`, with decimal point or decimal comma, and press Apply.
 4. Read the diagram, the hints below it and the table.
 
 A decimal point or a decimal comma can be typed, in both languages. The
