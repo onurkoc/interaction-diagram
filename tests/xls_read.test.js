@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as XLSX from '../app/vendor/xlsx-0.20.3.mjs';
-import { column_head, read_rows, read } from '../app/xls_read.js';
+import { column_head, read_rows, read, read_text, split_text, delimiter } from '../app/xls_read.js';
 import { design_values, section_forces, load_points } from '../app/loads.js';
 import { throwsKey } from './helpers.js';
 
@@ -206,4 +206,69 @@ test('loads: design values are gamma_d * value / 1000', () => {
     const [m, n] = design_values([100, -100], [-1000, -1500], 1.35);
     assert.deepEqual(m, [1.35 * 100 / 1000, 1.35 * -100 / 1000]);
     assert.deepEqual(n, [1.35 * -1000 / 1000, 1.35 * -1500 / 1000]);
+});
+
+// pasted text
+
+test('read_text: tab, semicolon and comma with numbers in quotes', () => {
+    const tab = read_text('N [kN]\tM [kNm]\n-1500\t120.5\n-800\t-60\n');
+    const semicolon = read_text('N [kN];M [kNm]\n-1500;120.5\n-800;-60\n');
+    const comma = read_text('N [kN],M [kNm]\n"-1500","120,5"\n-800,-60\n');
+    assert.deepEqual(tab, [[120.5, -60], [-1500, -800], false]);
+    assert.deepEqual(semicolon, tab);
+    assert.deepEqual(comma, tab);
+});
+
+test('read_text: decimal comma and decimal point, also with CRLF', () => {
+    const [x, y, per_metre] = read_text(
+        'n;m\r\n-1500,0;120,5\r\n-800;-6e1\r\n200.25;,5\r\n');
+    assert.deepEqual(x, [120.5, -60, 0.5]);
+    assert.deepEqual(y, [-1500, -800, 200.25]);
+    assert.equal(per_metre, false);
+});
+
+test('read_text: thousands separators are rejected, with the row', () => {
+    for (const cell of ["1'234", '1.234,5', '1,234.5', '1 234']) {
+        throwsKey(() => read_text(`n;m\n-100;10\n${cell};10\n`),
+                  'xls.not_a_number', { row: 3, cell: cell });
+    }
+    // text in an Excel cell still has to be a plain number with a point
+    throwsKey(() => read_rows([['n', 'm'], ['-1000,5', 10]]),
+              'xls.not_a_number', { row: 2, cell: '-1000,5' });
+});
+
+test('read_text: Plaxis heads give per_metre, mixed units are rejected', () => {
+    const [x, y, per_metre] = read_text('N [kN/m]\tM [kN m/m]\n-100,5\t12\n');
+    assert.deepEqual(x, [12]);
+    assert.deepEqual(y, [-100.5]);
+    assert.equal(per_metre, true);
+    throwsKey(() => read_text('N [kN/m]\tM [kNm]\n-100\t12\n'),
+              'xls.units_mixed');
+});
+
+test('read_text: missing column, empty rows, row with one value', () => {
+    throwsKey(() => read_text('N [kN]\tQ\n-100\t12\n'), 'xls.column_missing');
+    throwsKey(() => read_text(''), 'xls.empty_table');
+    throwsKey(() => read_text('n;m\n'), 'xls.no_values');
+    // empty lines are skipped; the row number is the line in the text
+    assert.deepEqual(read_text('n;m\n\n-100;10\n\n\n-200;20\n'),
+                     [[10, 20], [-100, -200], false]);
+    throwsKey(() => read_text('n;m\n\n-100;10\n-200\n'),
+              'xls.value_missing', { row: 4 });
+    throwsKey(() => read_text('n;m\n-100;abc\n'),
+              'xls.not_a_number', { row: 2, cell: 'abc' });
+});
+
+test('read_text: same table as text and as rows gives the same x and y', () => {
+    const rows = [['N [kN]', 'M [kNm]'], [-1500, 120.5], [-800, -60], [200, 15]];
+    const text = 'N [kN]\tM [kNm]\n-1500,0\t120,5\n-800\t-60\n200\t15\n';
+    assert.deepEqual(read_text(text), read_rows(rows));
+});
+
+test('split_text: delimiter, quotes, line ends', () => {
+    assert.equal(delimiter('a\tb;c,d'), '\t');
+    assert.equal(delimiter('a;b,c'), ';');
+    assert.equal(delimiter('a,b'), ',');
+    assert.deepEqual(split_text('a,"b,c","d""e"\r\nf,g'),
+                     [['a', 'b,c', 'd"e'], ['f', 'g']]);
 });
