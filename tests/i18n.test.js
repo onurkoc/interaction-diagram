@@ -164,3 +164,16 @@ test('default_language: German for de, English otherwise', () => {
         assert.equal(default_language(language), 'en', String(language));
     }
 });
+
+test('i18n: the keys of "Paste values" exist in German and English', () => {
+    const keys = ['paste.summary', 'paste.help', 'paste.apply', 'paste.name',
+                  'paste.read', 'paste.read_plaxis'];
+    for (const lang of LANGUAGES) {
+        for (const key of keys) {
+            assert.ok(typeof TEXTS[lang][key] === 'string' &&
+                      TEXTS[lang][key] !== '', `${lang}: ${key}`);
+        }
+    }
+    assert.deepEqual(parameters(TEXTS['de']['paste.read']), ['count', 'name']);
+    assert.deepEqual(parameters(TEXTS['en']['paste.read_plaxis']), ['count', 'name']);
+});

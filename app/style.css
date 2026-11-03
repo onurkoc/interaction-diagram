@@ -83,7 +83,8 @@ header a {
     background: #1f4e79;
 }
 
-#drop-zone button {
+#drop-zone button,
+#paste-box button {
     margin: 4px 6px 0 0;
 }
 
@@ -132,6 +133,26 @@ header a {
 
 #drop-zone p {
     margin: 6px 0 0;
+}
+
+#paste-box {
+    margin-top: 8px;
+}
+
+#paste-box summary {
+    cursor: pointer;
+    font-size: 14px;
+}
+
+textarea {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 5px 6px;
+    font-family: consolas, monospace;
+    font-size: 13px;
+    border: 1px solid #888;
+    border-radius: 3px;
 }
 
 #file-message:empty {

@@ -12,7 +12,7 @@ functions get a translator t, messages are keys with parameters.
 import { int_diagram, min_eccentricity_moments } from './core.js';
 import { cult_I_details, cult_I_min_eccentricity } from './cult_i.js';
 import { radial_utilization, origin_inside } from './utilization.js';
-import { read } from './xls_read.js';
+import { read, read_text } from './xls_read.js';
 import { load_points } from './loads.js';
 import { figure, draw, cult_text, min_cult_I, max_utilization } from './draw.js';
 import { en1992 } from './norms/en1992.js';
@@ -735,6 +735,7 @@ export function start({ XLSX, Plotly }) {
     const form = /** @type {HTMLFormElement} */ (element('inputs'));
     const drop_zone = element('drop-zone');
     const file_input = input('file');
+    const paste = /** @type {HTMLTextAreaElement} */ (element('paste'));
     const file_message = element('file-message');
     const messages_box = element('messages');
     const diagram = element('diagram');
@@ -1002,6 +1003,26 @@ export function start({ XLSX, Plotly }) {
     }
 
     /**
+     * Take the load values from the pasted text. Same as a newly read
+     * file: the old load points are replaced, also if the text is wrong.
+     */
+    function apply_paste() {
+        try {
+            const [x, y, per_metre] = read_text(paste.value);
+            const name = t('paste.name');
+            loads = { x: x, y: y, per_metre: per_metre, name: name };
+            file_state = { error: null, message: {
+                key: per_metre ? 'paste.read_plaxis' : 'paste.read',
+                params: { name: name, count: x.length } } };
+        } catch (error) {
+            loads = null;
+            file_state = { error: error, message: null };
+        }
+        show_file_state();
+        update();
+    }
+
+    /**
      * All texts of the page in the chosen language. The values of the
      * inputs stay; only their decimal sign follows the language.
      */
@@ -1166,6 +1187,7 @@ export function start({ XLSX, Plotly }) {
             read_file(files[0]);
         }
     });
+    element('paste-apply').addEventListener('click', apply_paste);
     element('remove-file').addEventListener('click', () => {
         loads = null;
         file_state = null;
