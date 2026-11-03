@@ -38,6 +38,16 @@ export const TEXTS = {
         'file.only_xlsx': '«{name}»: Es werden nur Excel-Dateien (.xlsx) gelesen.',
         'file.read': '«{name}» gelesen: {count} Lastpunkte.',
         'file.read_plaxis': '«{name}» gelesen: {count} Lastpunkte (Plaxis, Werte pro Meter).',
+        'file.read_one': '«{name}» gelesen: 1 Lastpunkt.',
+        'file.read_plaxis_one': '«{name}» gelesen: 1 Lastpunkt (Plaxis, Werte pro Meter).',
+        'paste.summary': 'Werte einfügen',
+        'paste.help': 'Tabelle mit Kopfzeile N und M (klein geschrieben n; m sollte auch funktionieren) (oder N [kN/m] und M [kN m/m] aus Plaxis 2D) einfügen, z. B. aus Excel kopiert (Tabulator) oder mit ; getrennt. Dezimalpunkt oder Dezimalkomma.',
+        'paste.apply': 'Übernehmen',
+        'paste.name': 'Eingefügte Werte',
+        'paste.read': '«{name}» gelesen: {count} Lastpunkte.',
+        'paste.read_plaxis': '«{name}» gelesen: {count} Lastpunkte (Plaxis, Werte pro Meter).',
+        'paste.read_one': '«{name}» gelesen: 1 Lastpunkt.',
+        'paste.read_plaxis_one': '«{name}» gelesen: 1 Lastpunkt (Plaxis, Werte pro Meter).',
 
         // inputs
         'section.legend': 'Querschnitt',
@@ -221,6 +231,16 @@ export const TEXTS = {
         'file.only_xlsx': '«{name}»: only Excel files (.xlsx) are read.',
         'file.read': '«{name}» read: {count} load points.',
         'file.read_plaxis': '«{name}» read: {count} load points (Plaxis, values per metre).',
+        'file.read_one': '«{name}» read: 1 load point.',
+        'file.read_plaxis_one': '«{name}» read: 1 load point (Plaxis, values per metre).',
+        'paste.summary': 'Paste values',
+        'paste.help': 'Paste a table with the head row N and M (lower case n and m work too), or N [kN/m] and M [kN m/m] from Plaxis 2D, e.g. copied from Excel (tab) or separated by ;. Decimal point or decimal comma.',
+        'paste.apply': 'Apply',
+        'paste.name': 'Pasted values',
+        'paste.read': '«{name}» read: {count} load points.',
+        'paste.read_plaxis': '«{name}» read: {count} load points (Plaxis, values per metre).',
+        'paste.read_one': '«{name}» read: 1 load point.',
+        'paste.read_plaxis_one': '«{name}» read: 1 load point (Plaxis, values per metre).',
 
         // inputs
         'section.legend': 'Cross-section',

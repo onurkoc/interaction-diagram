@@ -1,26 +1,40 @@
 // @ts-check
 /*
-The two tools of the MCP server, as plain functions without the MCP
+The tools of the MCP server, as plain functions without the MCP
 library, so that they can be tested directly.
 
 All calculation is done by the modules of the app (../app). This file
 only converts units and signs, passes the input to the check of the app
 and writes the answer. Invalid input is rejected with the messages of
-the app, nothing is corrected.
+the app, nothing is corrected. The sources of the inputs and the
+conversion of cover and bars are in sources.js, the rules and the
+assessment in rules.js.
 
 It is a pre-check, not a verification with a recognised program.
 */
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { NORMS, check_inputs, calculate, hints, message_text, error_text }
     from '../app/app.js';
 import { max_utilization } from '../app/draw.js';
 import { translator, LANGUAGES } from '../app/i18n.js';
+import { intersection } from '../app/intersection.js';
+import { read } from '../app/xls_read.js';
+import { section_sources, load_sources, check_source, note_kind,
+         ENVELOPE_ROLES } from './sources.js';
+import { RULES, assessment, reason } from './rules.js';
 
 /** @typedef {import('../app/app.js').RawInputs} RawInputs */
 /** @typedef {import('../app/app.js').Result} Result */
 /** @typedef {import('../app/norms/en1992.js').Norm} Norm */
 /** @typedef {import('../app/i18n.js').Translator} Translator */
+
+// SheetJS of the app (app/vendor), as in the tests of xls_read.js; the
+// path is a variable, so that the type check does not read the library
+const XLSX_PATH = '../app/vendor/xlsx-0.20.3.mjs';
+const XLSX = await import(XLSX_PATH);
 
 export const DISCLAIMER =
     'Vorprüfung – kein Nachweis mit einem anerkannten Programm';
@@ -65,15 +79,33 @@ const SECTION_INPUTS = /** @type {Object<string, string>} */ ({
  * @property {string} [moment_unit]  'kNm' | 'MNm', required
  * @property {string} [compression]  'negative' | 'positive', required
  * @property {string} [language]  'en' (default) | 'de', texts of the answer
+ * @property {Object<string, any>} [sources]  source of every value of the
+ *     section (sources.js), required
+ * @property {Object<string, number>} [cover_1]  instead of d_1: c_nom [m],
+ *     bar_diameter [mm], transverse_diameter [mm]
+ * @property {Object<string, number>} [cover_2]  instead of d_2
+ * @property {Object<string, any>[]} [bars_1]  instead of a_s1: bars and
+ *     meshes, each with its source
+ * @property {Object<string, any>[]} [bars_2]  instead of a_s2
  */
 
 /**
  * Input of the tool check_loads.
  * @typedef {SectionArgs & {
- *     loads?: {N: number, M: number}[],
+ *     loads?: import('./sources.js').LoadInput[],
  *     gamma_d?: number,
  *     min_eccentricity?: boolean,
  * }} LoadArgs
+ */
+
+/**
+ * Input of the tool check_loads_file.
+ * @typedef {SectionArgs & {
+ *     file?: string,
+ *     file_source?: import('./sources.js').LoadSource,
+ *     gamma_d?: number,
+ *     min_eccentricity?: boolean,
+ * }} FileArgs
  */
 
 /** Invalid input of a tool; the message is meant for the agent. */
@@ -261,19 +293,49 @@ function calculated(call, t) {
 }
 
 /**
- * What every answer contains besides the result.
+ * The section of a call, checked: convention, sources, converted cover
+ * and bars, and the input checked by the app.
+ * @typedef {Object} Section
+ * @property {ReturnType<typeof check_convention>} c
+ * @property {import('./sources.js').SectionSources} sources
+ * @property {Object<string, any>} args  the call with d_i and a_s_i as
+ *     the app gets them
+ */
+
+/**
+ * Check the convention and the sources of the section; convert cover and
+ * bars. Every problem of the sources is reported at once.
  * @param {SectionArgs} args
- * @param {Norm} norm
- * @param {Translator} t
+ * @returns {Section}
+ */
+function section_of(args) {
+    const c = check_convention(args);
+    /** @type {string[]} */
+    const errors = [];
+    const sources = section_sources(args, c.norm.defaults, c.language, errors);
+    if (errors.length > 0) {
+        throw new ToolInputError(errors);
+    }
+    return { c: c, sources: sources, args: { ...args, ...sources.values } };
+}
+
+/**
+ * What every answer contains besides the result.
+ * @param {Section} section
  * @param {Object<string, number>} presets
  * @returns {Object<string, any>}
  */
-function frame(args, norm, t, presets) {
+function frame(section, presets) {
+    const { c, args } = section;
+    const norm = c.norm;
+    const t = c.t;
     return {
         disclaimer: DISCLAIMER,
+        rules: (c.language === 'de') ? RULES.de : RULES.en,
         app_version: app_version(),
         norm: { id: args.norm, name: norm.name, label: t(norm.label) },
         validation: t('validation.note'),
+        input_record: section.sources.record,
         input: {
             ...args,
             input_units: INPUT_UNITS,
@@ -307,6 +369,66 @@ function app_hints(norm, result, loads, t) {
         .filter(text => text !== sign_hint);
 }
 
+
+/**
+ * The moment of the curve at a normal force, on both sides: the
+ * intersection of the curve with the horizontal line N = n, read as in
+ * tests/structuralcodes.test.js (largest moment on the positive side,
+ * smallest on the negative side).
+ * @param {number} n  normal force [MN], compression negative
+ * @param {import('../app/core.js').Values} values
+ * @returns {{positive: number | null, negative: number | null}}  [MNm];
+ *     null if n is outside of the range of the curve on that side
+ */
+function moments_at(n, values) {
+    /**
+     * @param {number[]} curve_m
+     * @param {number[]} curve_n
+     * @param {(x: number[]) => number} pick
+     * @returns {number | null}
+     */
+    const at = (curve_m, curve_n, pick) => {
+        if (n < Math.min(...curve_n) || n > Math.max(...curve_n)) {
+            return null;
+        }
+        const [x] = intersection([-1e3, 1e3], [n, n], curve_m, curve_n);
+        return (x.length > 0) ? pick(x) : null;
+    };
+    return {
+        positive: at(values['Moment Reinf'], values['Normal Force Reinf'],
+                     x => Math.max(...x)),
+        negative: at(values['Moment Reinf Neg'], values['Normal Force Reinf Neg'],
+                     x => Math.min(...x)),
+    };
+}
+
+/**
+ * Deviation of a value of the documents from the value of the tool,
+ * in % of the value of the tool. No limit: the reviewer decides.
+ * @param {number} document_value
+ * @param {number | null} tool_value
+ * @returns {Object<string, any>}
+ */
+function deviation(document_value, tool_value) {
+    if (tool_value === null) {
+        return { document: document_value, tool: null,
+                 note: 'no value of the tool at this point' };
+    }
+    if (tool_value === 0) {
+        return { document: document_value, tool: 0,
+                 note: 'the value of the tool is 0, no deviation in %' };
+    }
+    const percent = (Math.abs(document_value) - Math.abs(tool_value)) /
+                    Math.abs(tool_value) * 100;
+    return {
+        document: document_value,
+        tool: tool_value,
+        deviation_percent: Math.round(percent * 100) / 100,
+        relation: (percent > 0) ? 'document_higher'
+            : (percent < 0) ? 'document_lower' : 'equal',
+    };
+}
+
 /**
  * Tool interaction_diagram: the capacity curve with reinforcement,
  * both sides, and the design strengths.
@@ -314,10 +436,11 @@ function app_hints(norm, result, loads, t) {
  * @returns {Object<string, any>}
  */
 export function interaction_diagram(args) {
-    const c = check_convention(args);
+    const section = section_of(args);
+    const c = section.c;
     // the load factor does not change the curve, the check of the app
     // needs a value
-    const { raw, presets } = raw_inputs(args, c.norm, '1', false);
+    const { raw, presets } = raw_inputs(section.args, c.norm, '1', false);
     const params = checked_params(raw, c.norm, c.t);
     const result = calculated([params, c.norm, null, { radial: true }], c.t);
     const values = result.values;
@@ -334,7 +457,10 @@ export function interaction_diagram(args) {
     }));
 
     return {
-        ...frame(args, c.norm, c.t, presets),
+        assessment: assessment(section.sources.missing,
+                               section.sources.attention,
+                               'inputs_documented', c.language),
+        ...frame(section, presets),
         f_cd: result.input_values.f_cd,
         f_yd: result.input_values.f_yd,
         strength_unit: 'N/mm2',
@@ -354,62 +480,94 @@ export function interaction_diagram(args) {
 }
 
 /**
- * Tool check_loads: for every load point inside / outside and the radial
- * utilization, as in the app, and the governing point.
- * @param {LoadArgs} args
+ * What belongs to a load point besides N and M.
+ * @typedef {Object} PointMeta
+ * @property {import('./sources.js').LoadSource} source
+ * @property {string[]} roles
+ * @property {{M_Rd?: number, utilization?: number,
+ *             source: import('./sources.js').Source}} [document_values]
+ */
+
+/**
+ * The common part of check_loads and check_loads_file: the calculation
+ * of the app, the points with their sources, the comparison with the
+ * documents and the assessment.
+ * @param {Section} section
+ * @param {{min_eccentricity?: boolean, gamma_d?: number}} options
+ * @param {{x: number[], y: number[], per_metre: boolean}} loads
+ *     as the app reads a file: [kNm], [kN] or per metre, compression
+ *     negative
+ * @param {PointMeta[]} meta  one per load point
+ * @param {{missing: string[], attention: string[]}} of_loads
  * @returns {Object<string, any>}
  */
-export function check_loads(args) {
-    const c = check_convention(args);
-
+function evaluated(section, options, loads, meta, of_loads) {
+    const c = section.c;
     /** @type {string[]} */
     const errors = [];
-    if (!Array.isArray(args.loads) || args.loads.length === 0) {
-        errors.push('loads: at least one load point {N, M} is required.');
-    }
-    const loads = Array.isArray(args.loads) ? args.loads : [];
-    loads.forEach((point, i) => {
-        for (const name of ['N', 'M']) {
-            const value = /** @type {Object<string, any>} */ (point ?? {})[name];
-            if (typeof value !== 'number' || !Number.isFinite(value)) {
-                errors.push(`loads[${i}].${name}: ${JSON.stringify(value)} ` +
-                            'is not a finite number.');
-            }
-        }
-    });
     // the option exists in the EN mode only; there it is on by default,
     // as in the app (D8)
     const has_rule = c.norm.min_eccentricity !== null;
-    const eccentricity = args.min_eccentricity ?? has_rule;
+    const eccentricity = options.min_eccentricity ?? has_rule;
     if (eccentricity && !has_rule) {
         errors.push(c.t('core.no_min_eccentricity', { norm: c.norm.name }));
     }
-    const gamma_d = as_text('gamma_d', args.gamma_d, errors);
+    const gamma_d = as_text('gamma_d', options.gamma_d, errors);
     if (errors.length > 0) {
         throw new ToolInputError(errors);
     }
 
-    const { raw, presets } = raw_inputs(args, c.norm, gamma_d, eccentricity);
+    const { raw, presets } = raw_inputs(section.args, c.norm, gamma_d, eccentricity);
     const params = checked_params(raw, c.norm, c.t);
-
-    // to the units and the sign of the app: kN, kNm, compression negative
-    const app_loads = {
-        x: loads.map(p => p.M * c.moment),
-        y: loads.map(p => c.sign * p.N * c.force),
-        per_metre: false,
-        name: 'check_loads',
-    };
+    const app_loads = { ...loads, name: 'check_loads' };
     const result = calculated([params, c.norm, app_loads, { radial: true }], c.t);
 
-    const points = result.points.map((p, i) => ({
-        index: i + 1,
-        N_Ed: c.sign * p.n * 1000 / c.force,
-        M_Ed: p.m * 1000 / c.moment,
-        M_Ed_checked: p.m_mod * 1000 / c.moment,
-        modified_by_min_eccentricity: p.modified,
-        inside: p.inside,
-        utilization: p.utilization,
-    }));
+    const missing = [...section.sources.missing, ...of_loads.missing];
+    const attention = [...section.sources.attention, ...of_loads.attention];
+
+    /** @param {number | null} m  [MNm] */
+    const moment = (m) => (m === null) ? null : m * 1000 / c.moment;
+
+    const points = result.points.map((p, i) => {
+        const at_n = moments_at(p.n, result.values);
+        const M_Rd = { positive: moment(at_n.positive),
+                       negative: moment(at_n.negative) };
+        /** @type {Object<string, any>} */
+        const point = {
+            index: i + 1,
+            N_Ed: c.sign * p.n * 1000 / c.force,
+            M_Ed: p.m * 1000 / c.moment,
+            M_Ed_checked: p.m_mod * 1000 / c.moment,
+            modified_by_min_eccentricity: p.modified,
+            inside: p.inside,
+            utilization: p.utilization,
+            M_Rd_at_N_Ed: M_Rd,
+            roles: meta[i].roles,
+            source: meta[i].source,
+        };
+        if (!p.inside || (p.utilization !== null && p.utilization > 1)) {
+            attention.push(reason('outside', { index: i + 1,
+                                               utilization: p.utilization },
+                                  c.language));
+        }
+        const d = meta[i].document_values;
+        if (d !== undefined) {
+            /** @type {Object<string, any>} */
+            const comparison = { source: d.source };
+            if (d.M_Rd !== undefined) {
+                // the side of the moment stated in the documents
+                const positive = (d.M_Rd !== 0) ? d.M_Rd > 0
+                                                : point.M_Ed_checked >= 0;
+                comparison.M_Rd = deviation(d.M_Rd, positive ? M_Rd.positive
+                                                             : M_Rd.negative);
+            }
+            if (d.utilization !== undefined) {
+                comparison.utilization = deviation(d.utilization, p.utilization);
+            }
+            point.comparison_with_documents = comparison;
+        }
+        return point;
+    });
 
     // governing: the largest radial utilization, as in the summary of
     // the app
@@ -422,7 +580,8 @@ export function check_loads(args) {
     }
 
     return {
-        ...frame(args, c.norm, c.t, presets),
+        assessment: assessment(missing, attention, 'no_finding', c.language),
+        ...frame(section, presets),
         min_eccentricity: {
             applied: result.e0 !== null,
             e0_m: result.e0,
@@ -438,7 +597,11 @@ export function check_loads(args) {
             'utilization = |S_d| / |R_d| on the ray from the origin ' +
             'through the checked point (1 = on the curve, > 1 = outside, ' +
             'not capped); null if not defined (origin not inside of the ' +
-            'curve, e.g. plain concrete).',
+            'curve, e.g. plain concrete). M_Rd_at_N_Ed: moment of the ' +
+            'curve at N_Ed on both sides, null if N_Ed is beyond the curve. ' +
+            'comparison_with_documents: value of the documents, value of ' +
+            'the tool and the deviation in % of the tool (no limit, the ' +
+            'reviewer decides).',
         radial_utilization_defined: result.radial_defined,
         summary: {
             total: points.length,
@@ -449,5 +612,134 @@ export function check_loads(args) {
         governing: governing,
         points: points,
         hints: app_hints(c.norm, result, app_loads, c.t),
+    };
+}
+
+/**
+ * Tool check_loads: for every load point inside / outside and the radial
+ * utilization, as in the app, the governing point, and the comparison
+ * with the values of the documents.
+ * @param {LoadArgs} args
+ * @returns {Object<string, any>}
+ */
+export function check_loads(args) {
+    const section = section_of(args);
+    const c = section.c;
+
+    /** @type {string[]} */
+    const errors = [];
+    if (!Array.isArray(args.loads) || args.loads.length === 0) {
+        errors.push('loads: at least one load point {N, M, source} is required.');
+    }
+    const loads = Array.isArray(args.loads) ? args.loads : [];
+    loads.forEach((point, i) => {
+        for (const name of ['N', 'M']) {
+            const value = /** @type {Object<string, any>} */ (point ?? {})[name];
+            if (typeof value !== 'number' || !Number.isFinite(value)) {
+                errors.push(`loads[${i}].${name}: ${JSON.stringify(value)} ` +
+                            'is not a finite number.');
+            }
+        }
+    });
+    const of_loads = load_sources(loads, c.language, errors);
+    if (errors.length > 0) {
+        throw new ToolInputError(errors);
+    }
+
+    // to the units and the sign of the app: kN, kNm, compression negative
+    const app_loads = {
+        x: loads.map(p => p.M * c.moment),
+        y: loads.map(p => c.sign * p.N * c.force),
+        per_metre: false,
+    };
+    const meta = loads.map(p => ({
+        source: p.source,
+        roles: (p.role !== undefined) ? [p.role] : [],
+        document_values: p.document_values,
+    }));
+    return evaluated(section, args, app_loads, meta, of_loads);
+}
+
+/**
+ * Tool check_loads_file: the load points of a table (.xlsx) read with
+ * the import of the app, all rows. The envelope roles are set by the
+ * tool: the points with the largest and smallest N and M (sign
+ * convention of the call).
+ * @param {FileArgs} args
+ * @returns {Object<string, any>}
+ */
+export function check_loads_file(args) {
+    const section = section_of(args);
+    const c = section.c;
+
+    /** @type {string[]} */
+    const errors = [];
+    const file = args.file;
+    if (typeof file !== 'string' || !isAbsolute(file) ||
+        !file.toLowerCase().endsWith('.xlsx')) {
+        errors.push('file: the absolute path of an .xlsx file is required.');
+    }
+    const source = check_source('file_source', args.file_source, errors, true);
+    if (errors.length > 0) {
+        throw new ToolInputError(errors);
+    }
+
+    /** @type {Uint8Array} */
+    let data;
+    try {
+        data = readFileSync(/** @type {string} */ (file));
+    } catch (error) {
+        throw new ToolInputError([`file: cannot be read (${String(error)}).`]);
+    }
+    /** @type {[number[], number[], boolean]} */
+    let table;
+    try {
+        table = read(data, XLSX);
+    } catch (error) {
+        throw new ToolInputError([error_text(error, c.t)]);
+    }
+    const [x, y, per_metre] = table;
+
+    /** @type {import('./sources.js').Notes} */
+    const of_loads = { missing: [], attention: [], language: c.language };
+    const file_source = /** @type {import('./sources.js').LoadSource} */ (source);
+    note_kind(reason('load_points', {}, c.language), file_source, of_loads);
+
+    // roles: largest and smallest N and M in the convention of the call;
+    // gamma_d and the width do not change the order
+    const n_call = y.map(value => c.sign * value);
+    /**
+     * Index of the best value of a list.
+     * @param {number[]} list
+     * @param {(a: number, b: number) => boolean} better
+     * @returns {number}
+     */
+    const pick = (list, better) => list.reduce(
+        (best, value, i) => better(value, list[best]) ? i : best, 0);
+    /** @type {Object<string, number>} */
+    const chosen = {
+        max_N: pick(n_call, (a, b) => a > b),
+        min_N: pick(n_call, (a, b) => a < b),
+        max_M: pick(x, (a, b) => a > b),
+        min_M: pick(x, (a, b) => a < b),
+    };
+    const meta = x.map((_, i) => ({
+        source: file_source,
+        roles: ENVELOPE_ROLES.filter(role => chosen[role] === i),
+    }));
+
+    const answer = evaluated(section, args, { x: x, y: y, per_metre: per_metre },
+                             meta, of_loads);
+    return {
+        ...answer,
+        file: {
+            path: file,
+            rows_read: x.length,
+            per_metre: per_metre,
+            note: 'First sheet, columns n and m as in the app (compression ' +
+                'negative, M as in the file); per metre values are ' +
+                'multiplied by b. index = n-th row with values, empty rows ' +
+                'are skipped.',
+        },
     };
 }

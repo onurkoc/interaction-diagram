@@ -97,16 +97,27 @@ function is_empty(cell) {
 /**
  * Value of a cell as a number. Text is accepted only if it is a plain
  * number with a decimal point; nothing is corrected silently.
+ * Pasted text (from_text) may also have a decimal comma, as copied from
+ * Excel with German settings; a thousands separator is not accepted.
  * @param {any} cell
- * @param {number} row  row number as in Excel, for the message
+ * @param {number} row  row number as in Excel (or in the pasted text)
+ * @param {boolean} from_text  cell comes from pasted text
  * @returns {number}
  */
-function to_number(cell, row) {
+function to_number(cell, row, from_text) {
     let value = NaN;
     if (typeof cell === 'number') {
         value = cell;
     } else if (typeof cell === 'string') {
-        value = Number(cell.trim());
+        const text = cell.trim();
+        if (from_text) {
+            // one decimal sign, point or comma, and an optional exponent
+            if (/^[+-]?(\d+([.,]\d*)?|[.,]\d+)([eE][+-]?\d+)?$/.test(text)) {
+                value = Number(text.replace(',', '.'));
+            }
+        } else {
+            value = Number(text);
+        }
     }
     if (!Number.isFinite(value)) {
         throw new TextError('xls.not_a_number', { row: row, cell: String(cell) });
@@ -117,10 +128,12 @@ function to_number(cell, row) {
 /**
  * Read the columns m and n from the rows of a table.
  * @param {any[][]} rows  rows[0]: column heads, then one row per load point
+ * @param {boolean} [from_text]  rows come from pasted text: decimal comma
+ *     allowed in the cells
  * @returns {[number[], number[], boolean]} x: moments, y: normal forces,
  *     per_metre: false: [kNm] and [kN], true: [kNm/m] and [kN/m]
  */
-export function read_rows(rows) {
+export function read_rows(rows, from_text = false) {
     if (rows.length === 0) {
         throw new TextError('xls.empty_table');
     }
@@ -177,8 +190,8 @@ export function read_rows(rows) {
         if (is_empty(cell_m) || is_empty(cell_n)) {
             throw new TextError('xls.value_missing', { row: row });
         }
-        x.push(to_number(cell_m, row));
-        y.push(to_number(cell_n, row));
+        x.push(to_number(cell_m, row, from_text));
+        y.push(to_number(cell_n, row, from_text));
     }
     if (x.length === 0) {
         throw new TextError('xls.no_values');
@@ -201,4 +214,84 @@ export function read(data, XLSX) {
     const rows = XLSX.utils.sheet_to_json(
         sheet, { header: 1, raw: true, defval: null, blankrows: true });
     return read_rows(rows);
+}
+
+/**
+ * Delimiter of a text table: tab (copied from a spreadsheet), else ';',
+ * else ','. With ',' a decimal comma is possible only in quotes.
+ * @param {string} text
+ * @returns {string}
+ */
+export function delimiter(text) {
+    if (text.includes('\t')) {
+        return '\t';
+    }
+    if (text.includes(';')) {
+        return ';';
+    }
+    return ',';
+}
+
+/**
+ * Split a text table into rows of cells. Cells in double quotes may hold
+ * the delimiter; "" in quotes is one quote. Every line of the text is one
+ * row (empty lines too), so the index of a row is the line number - 1.
+ * @param {string} text
+ * @returns {string[][]}
+ */
+export function split_text(text) {
+    const sep = delimiter(text);
+    /** @type {string[][]} */
+    const rows = [];
+    /** @type {string[]} */
+    let row = [];
+    let cell = '';
+    let quoted = false;
+    // without a byte order mark
+    const body = text.replace(/^\uFEFF/, '');
+    for (let i = 0; i < body.length; i++) {
+        const ch = body[i];
+        if (quoted) {
+            if (ch === '"' && body[i + 1] === '"') {
+                cell += '"';
+                i++;
+            } else if (ch === '"') {
+                quoted = false;
+            } else {
+                cell += ch;
+            }
+        } else if (ch === '"') {
+            quoted = true;
+        } else if (ch === sep) {
+            row.push(cell);
+            cell = '';
+        } else if (ch === '\n' || ch === '\r') {
+            if (ch === '\r' && body[i + 1] === '\n') {
+                i++;
+            }
+            row.push(cell);
+            rows.push(row);
+            row = [];
+            cell = '';
+        } else {
+            cell += ch;
+        }
+    }
+    if (cell !== '' || row.length > 0) {
+        row.push(cell);
+        rows.push(row);
+    }
+    return rows;
+}
+
+/**
+ * Read the load values from pasted text (table with a head row). Same
+ * column heads and same result as read(); row numbers in the messages
+ * are the lines of the text.
+ * @param {string} text
+ * @returns {[number[], number[], boolean]} x: moments, y: normal forces,
+ *     per_metre: false: [kNm] and [kN], true: [kNm/m] and [kN/m]
+ */
+export function read_text(text) {
+    return read_rows(split_text(text), true);
 }

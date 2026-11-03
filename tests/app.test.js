@@ -880,6 +880,51 @@ test('radial utilization: not defined for a plain concrete section', () => {
     }
 });
 
+test('message_text: pasted values take their name from the language', () => {
+    /** @type {import('../app/app.js').TextMessage} */
+    const message = { key: 'paste.read', params: { count: 3 } };
+    assert.equal(message_text(message, de), '«Eingefügte Werte» gelesen: 3 Lastpunkte.');
+    assert.equal(message_text(message, en), '«Pasted values» read: 3 load points.');
+    // the hint below the diagram too: no name is stored for pasted values
+    const { params } = check_inputs(raw({}), sia262);
+    const pasted = { x: [100], y: [-1000], per_metre: false, name: null };
+    const result = calculate(params, sia262, pasted, {});
+    assert.ok(hints(sia262, result, pasted, de).some(
+        line => line.includes('«Eingefügte Werte»')));
+    assert.ok(hints(sia262, result, pasted, en).some(
+        line => line.includes('«Pasted values»')));
+    // an Excel file keeps its name in both languages
+    const file = loads_of([100], [-1000]);
+    assert.ok(hints(sia262, result, file, en).some(
+        line => line.includes('«test.xlsx»')));
+});
+
+test('message_text: one load point is in the singular, three are not', () => {
+    const expected = {
+        'file.read': ['«x» gelesen: 1 Lastpunkt.', '«x» gelesen: 3 Lastpunkte.',
+                      '«x» read: 1 load point.', '«x» read: 3 load points.'],
+        'file.read_plaxis': [
+            '«x» gelesen: 1 Lastpunkt (Plaxis, Werte pro Meter).',
+            '«x» gelesen: 3 Lastpunkte (Plaxis, Werte pro Meter).',
+            '«x» read: 1 load point (Plaxis, values per metre).',
+            '«x» read: 3 load points (Plaxis, values per metre).'],
+    };
+    for (const [key, [de1, de3, en1, en3]] of Object.entries(expected)) {
+        for (const prefix of ['file', 'paste']) {
+            const k = prefix + key.slice(4);
+            const name = (prefix === 'file') ? 'x' : undefined;
+            const text = (lang, count, want) => {
+                const out = message_text({ key: k, params: { name: name, count: count } }, lang);
+                // pasted values show the name of the language
+                assert.equal(out, (prefix === 'file') ? want :
+                    want.replace('«x»', '«' + lang('paste.name') + '»'), k);
+            };
+            text(de, 1, de1); text(de, 3, de3);
+            text(en, 1, en1); text(en, 3, en3);
+        }
+    }
+});
+
 test('hints: norm, simplifications and the handling of the file', () => {
     const { params } = check_inputs(raw({ b_: '0.5' }), sia262);
     const loads = loads_of([100], [-1000], true);

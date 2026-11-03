@@ -12,7 +12,7 @@ functions get a translator t, messages are keys with parameters.
 import { int_diagram, min_eccentricity_moments } from './core.js';
 import { cult_I_details, cult_I_min_eccentricity } from './cult_i.js';
 import { radial_utilization, origin_inside } from './utilization.js';
-import { read } from './xls_read.js';
+import { read, read_text } from './xls_read.js';
 import { load_points } from './loads.js';
 import { figure, draw, cult_text, min_cult_I, max_utilization } from './draw.js';
 import { en1992 } from './norms/en1992.js';
@@ -74,7 +74,8 @@ export const NORMS = /** @type {Object<string, Norm>} */ ({
  * @property {number[]} x  moments, [kNm] or [kNm/m]
  * @property {number[]} y  normal forces, [kN] or [kN/m]
  * @property {boolean} per_metre  true: values per metre (Plaxis 2D)
- * @property {string} name  name of the file
+ * @property {string | null} name  name of the file; null: pasted values
+ *     (their name is taken from the language when it is shown)
  */
 
 /**
@@ -218,6 +219,10 @@ export function shown_messages(messages, touched, has_file) {
         !message.missing || has_file || touched.has(message.field));
 }
 
+// messages with a count of load points; each has a key + '_one'
+const PLURAL_KEYS = ['file.read', 'file.read_plaxis',
+                     'paste.read', 'paste.read_plaxis'];
+
 /**
  * Text of a message in the chosen language.
  * @param {Message | TextMessage} message
@@ -226,6 +231,15 @@ export function shown_messages(messages, touched, has_file) {
  */
 export function message_text(message, t) {
     const params = { ...message.params };
+    let key = message.key;
+    if (key.startsWith('paste.read')) {
+        // pasted values: the name follows the language
+        params['name'] = t('paste.name');
+    }
+    if (PLURAL_KEYS.includes(key) && params['count'] === 1) {
+        // exactly one load point
+        key += '_one';
+    }
     if ('field' in message && message.field !== '' && message.field !== 'eta_t') {
         // name of the input, e.g. «Höhe h» / «Height h»
         params['name'] = t('name.' + message.field);
@@ -234,7 +248,7 @@ export function message_text(message, t) {
         // a message of the norm inside the message
         params['text'] = message_text(params['message'], t);
     }
-    return t(message.key, params);
+    return t(key, params);
 }
 
 /**
@@ -678,7 +692,7 @@ export function hints(norm, result, loads, t, { cult = false, radial = false } =
     }
 
     if (loads !== null) {
-        list.push(t('hint.loads', { name: loads.name, count: loads.x.length,
+        list.push(t('hint.loads', { name: loads.name ?? t('paste.name'), count: loads.x.length,
                                     gamma_d: i_val['gamma_d'] }));
         if (loads.per_metre) {
             list.push(t('hint.per_metre', { b: i_val['b'] }));
@@ -735,6 +749,7 @@ export function start({ XLSX, Plotly }) {
     const form = /** @type {HTMLFormElement} */ (element('inputs'));
     const drop_zone = element('drop-zone');
     const file_input = input('file');
+    const paste = /** @type {HTMLTextAreaElement} */ (element('paste'));
     const file_message = element('file-message');
     const messages_box = element('messages');
     const diagram = element('diagram');
@@ -1002,6 +1017,25 @@ export function start({ XLSX, Plotly }) {
     }
 
     /**
+     * Take the load values from the pasted text. Same as a newly read
+     * file: the old load points are replaced, also if the text is wrong.
+     */
+    function apply_paste() {
+        try {
+            const [x, y, per_metre] = read_text(paste.value);
+            loads = { x: x, y: y, per_metre: per_metre, name: null };
+            file_state = { error: null, message: {
+                key: per_metre ? 'paste.read_plaxis' : 'paste.read',
+                params: { count: x.length } } };
+        } catch (error) {
+            loads = null;
+            file_state = { error: error, message: null };
+        }
+        show_file_state();
+        update();
+    }
+
+    /**
      * All texts of the page in the chosen language. The values of the
      * inputs stay; only their decimal sign follows the language.
      */
@@ -1166,6 +1200,7 @@ export function start({ XLSX, Plotly }) {
             read_file(files[0]);
         }
     });
+    element('paste-apply').addEventListener('click', apply_paste);
     element('remove-file').addEventListener('click', () => {
         loads = null;
         file_state = null;

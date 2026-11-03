@@ -98,6 +98,9 @@ The app shows this note on its first page and below the calculator.
 
 3. Optional: drop an Excel file with the load points on the dashed area, or
    choose it with the button.
+   Or use **Paste values** (below the dashed area): paste a table with the head
+   row `N` and `M` (or the Plaxis heads), copied from Excel (tab) or separated by
+   `;`, with decimal point or decimal comma, and press Apply.
 4. Read the diagram, the hints below it and the table.
 
 A decimal point or a decimal comma can be typed, in both languages. The
@@ -307,8 +310,12 @@ without using the web page. **It is a pre-check, not a verification
 with a recognised program**; every answer says so.
 
 - The calculation is the one of the app: the server calls the modules
-  in `app/` and has no calculation of its own. `agent/` is not part of
-  the web app and is not deployed.
+  in `app/`. Its own arithmetic is limited to units and signs and to two
+  conversions, so that the agent does not calculate: the axis distance
+  from the cover (`cover_1`: d = c_nom + transverse diameter + bar
+  diameter / 2) and the reinforcement from bars and meshes (`bars_1`:
+  a_s = b · sum of the areas per metre). `agent/` is not part of the web
+  app and is not deployed.
 - Same limits as the app (see [Scope and limits](#scope-and-limits)).
   Invalid input is rejected with the messages of the app, nothing is
   corrected (e.g. f_ck > 50, d_1 ≥ h, a missing η_t in the SIA mode).
@@ -320,19 +327,48 @@ with a recognised program**; every answer says so.
 - The section is given in m (h, b, d_1, d_2), cm² (a_s1, a_s2) and
   N/mm² (f_ck, f_yk). γ_c, γ_s, α_cc and α_cc,pl take the preset of the
   app if they are not given; the answer lists them.
-- Every answer contains the input as understood, the code, the version
-  of the app (git commit), the validation status and the note
-  «Vorprüfung – kein Nachweis mit einem anerkannten Programm».
+
+Rules for the agent (R1 to R5). They are sent as the instructions of
+the server and in every answer (`rules`), so they apply to every agent
+without being repeated in its task:
+
+- **R1** Inputs only from the documents under review, each with its
+  location. Every value of the section needs a source in `sources`
+  (`document`, `location`, `kind`), every load point its own `source`
+  with the load combination. `kind` is `text`, `table`, `plan`,
+  `figure_reading` or `assumed`; there is no kind for a value derived
+  from a result of the documents. A missing source is rejected.
+- **R2** An `assumed` value is calculated, but the answer is «not
+  assessable – information missing: …».
+- **R3** N and M of a point come from one place (one source per point).
+  A value read from a figure, a load combination without points for
+  the roles `max_N`, `min_N`, `max_M` and `min_M`, or a point outside
+  of the curve make the answer «needs attention».
+- **R4** Every answer contains the input as understood with its
+  sources (`input_record`, converted values with their formula), the
+  norm, the version of the app (git commit) and the validation status.
+- **R5** The assessment is set by the tool (`assessment`: `status` and
+  `text`); there is no «in order». The numbers are a hint to the
+  reviewer, the note «Vorprüfung – kein Nachweis mit einem anerkannten
+  Programm» is in every answer.
 
 Tools:
 
 - `interaction_diagram`: the capacity curve with reinforcement (both
   sides, points N–M), f_cd and f_yd.
-- `check_loads`: the same input plus `loads` (list of `{N, M}`) and the
-  load factor `gamma_d` (required, 1.0 for design values). For every
-  point: inside / outside and the radial utilization as in the app;
-  the governing point is the one with the largest utilization. Option
-  `min_eccentricity` (EN only, on by default as in the app).
+- `check_loads`: the same input plus `loads` (list of `{N, M, source,
+  role, document_values}`) and the load factor `gamma_d` (required, 1.0
+  for design values). For every point: inside / outside, the radial
+  utilization as in the app and M_Rd at N_Ed on both sides (read from
+  the curve as in the comparison with structuralcodes); the governing
+  point is the one with the largest utilization. Option
+  `min_eccentricity` (EN only, on by default as in the app). With
+  `document_values` (M_Rd or utilization stated in the documents, with
+  their source) the answer lists both values and the deviation in % of
+  the tool, without a limit.
+- `check_loads_file`: as `check_loads` for all rows of an `.xlsx` table
+  (columns `n` and `m` as in the app, also Plaxis 2D per metre), read
+  with the import of the app; the tool marks the points with the roles.
 
 Install (Node.js 24) and add it to Claude Code:
 
@@ -347,11 +383,33 @@ Example call of `check_loads`:
 ```json
 {
   "norm": "sia262",
-  "h": 0.30, "b": 1.0, "d_1": 0.05, "d_2": 0.05,
-  "a_s1": 5.24, "a_s2": 5.24, "f_ck": 30, "f_yk": 500, "eta_t": 0.85,
+  "h": 0.30, "b": 1.0, "d_2": 0.05,
+  "cover_1": { "c_nom": 0.04, "bar_diameter": 12, "transverse_diameter": 0 },
+  "bars_1": [{ "diameter_mm": 12, "spacing_m": 0.15,
+               "source": { "document": "Plan 101", "location": "section A",
+                           "kind": "plan" } }],
+  "a_s2": 5.24, "f_ck": 30, "f_yk": 500, "eta_t": 0.85,
+  "sources": {
+    "norm":    { "document": "Project basis", "location": "chapter 3", "kind": "text" },
+    "h":       { "document": "Plan 101", "location": "section A", "kind": "plan" },
+    "b":       { "document": "Report 1", "location": "chapter 5", "kind": "text" },
+    "cover_1": { "document": "Plan 101", "location": "notes", "kind": "plan" },
+    "d_2":     { "document": "Report 1", "location": "table 4", "kind": "table" },
+    "a_s2":    { "document": "Report 1", "location": "table 4", "kind": "table" },
+    "f_ck":    { "document": "Report 1", "location": "chapter 2", "kind": "text" },
+    "f_yk":    { "document": "Report 1", "location": "chapter 2", "kind": "text" },
+    "eta_t":   { "document": "Report 1", "location": "chapter 2", "kind": "text" }
+  },
   "force_unit": "kN", "moment_unit": "kNm", "compression": "negative",
   "gamma_d": 1.0,
-  "loads": [{ "N": -1000, "M": 100 }, { "N": -1500, "M": -80 }]
+  "loads": [
+    { "N": -1000, "M": 100, "role": "max_M",
+      "source": { "document": "Report 1", "location": "table 7, row 3",
+                  "combination": "ULS 1", "kind": "table" },
+      "document_values": { "M_Rd": 150,
+        "source": { "document": "Report 1", "location": "table 8",
+                    "kind": "table" } } }
+  ]
 }
 ```
 
